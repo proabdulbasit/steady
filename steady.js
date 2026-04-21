@@ -158,7 +158,6 @@ async function callSteady({ system, messages, max_tokens }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
       system,
       messages,
       max_tokens,
@@ -805,4 +804,3 @@ export default function Steady() {
     </div>
   );
 }
-
