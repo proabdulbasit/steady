@@ -15,7 +15,7 @@ export default function HomePage() {
     const checkoutSessionId = searchParams?.get("session_id");
     if (checkout !== "success" || !checkoutSessionId || !isAuthenticated) return;
 
-    // If webhooks aren't configured (common locally), this sync makes the upgrade reflect immediately.
+    // If webhooks aren't configured (common locally), this sync makes the upgrade reflect immediately..
     syncCheckout(checkoutSessionId)
       .catch(() => null)
       .finally(() => refreshProfile());
