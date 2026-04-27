@@ -1,0 +1,42 @@
+const mongoose = require("mongoose");
+
+const usageSchema = new mongoose.Schema(
+  {
+    date: { type: String, required: true },
+    questionsUsed: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const integrationsSchema = new mongoose.Schema(
+  {
+    provider: { type: String, required: true },
+    status: { type: String, default: "disconnected" },
+    externalId: { type: String, default: "" },
+    connectedAt: { type: Date, default: null },
+    meta: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  { _id: false }
+);
+
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, default: "" },
+    email: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true },
+    role: { type: String, enum: ["user", "admin"], default: "user", index: true },
+    sessionIds: { type: [String], default: [] },
+    planId: { type: String, default: "free", index: true },
+    planSelected: { type: Boolean, default: true, index: true },
+    stripeCustomerId: { type: String, default: "", index: true },
+    stripeSubscriptionId: { type: String, default: "", index: true },
+    subscriptionStatus: { type: String, default: "inactive" },
+    currentPeriodEnd: { type: Date, default: null },
+    usage: { type: usageSchema, default: null },
+    integrations: { type: [integrationsSchema], default: [] },
+    lastCheckoutSessionId: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.models.User || mongoose.model("User", userSchema);
