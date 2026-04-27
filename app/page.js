@@ -1,28 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageShell, STARTER_QUESTIONS } from "../components/steady-ui";
 import { useSteady } from "../components/steady-provider";
 
 export default function HomePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { remainingQuestions, isPremium, isAuthenticated, syncCheckout, refreshProfile } = useSteady();
-
-  useEffect(() => {
-    const checkout = searchParams?.get("checkout");
-    const checkoutSessionId = searchParams?.get("session_id");
-    if (checkout !== "success" || !checkoutSessionId || !isAuthenticated) return;
-
-    // If webhooks aren't configured (common locally), this sync makes the upgrade reflect immediately..
-    syncCheckout(checkoutSessionId)
-      .catch(() => null)
-      .finally(() => refreshProfile());
-  }, [isAuthenticated, refreshProfile, searchParams, syncCheckout]);
+  const { remainingQuestions, isPremium } = useSteady();
 
   return (
     <PageShell>
+      <Suspense fallback={null}>
+        <CheckoutSync />
+      </Suspense>
       <div style={{ maxWidth: "760px", margin: "0 auto", textAlign: "center" }}>
         <div style={{ fontSize: "11px", letterSpacing: "3px", textTransform: "uppercase", color: "#C8A96E", marginBottom: "10px", textAlign: "center" }}>
           Built for real business owners
@@ -134,6 +125,24 @@ export default function HomePage() {
       </div>
     </PageShell>
   );
+}
+
+function CheckoutSync() {
+  const searchParams = useSearchParams();
+  const { isAuthenticated, syncCheckout, refreshProfile } = useSteady();
+
+  useEffect(() => {
+    const checkout = searchParams?.get("checkout");
+    const checkoutSessionId = searchParams?.get("session_id");
+    if (checkout !== "success" || !checkoutSessionId || !isAuthenticated) return;
+
+    // If webhooks aren't configured (common locally), this sync makes the upgrade reflect immediately.
+    syncCheckout(checkoutSessionId)
+      .catch(() => null)
+      .finally(() => refreshProfile());
+  }, [isAuthenticated, refreshProfile, searchParams, syncCheckout]);
+
+  return null;
 }
 
 const iconButtonStyle = {
