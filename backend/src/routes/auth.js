@@ -6,8 +6,25 @@ const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
+const ALLOWED_INDUSTRIES = new Set([
+  "restaurant",
+  "pawnshop",
+  "auto_shop",
+  "retail",
+  "salon",
+  "cleaning",
+  "contractor",
+  "food_truck",
+  "landscaping",
+  "gym",
+]);
+
+function normalizeIndustry(value) {
+  return ALLOWED_INDUSTRIES.has(value) ? value : "restaurant";
+}
+
 router.post("/register", async (req, res) => {
-  const { name = "", email = "", password = "", sessionId = "" } = req.body || {};
+  const { name = "", email = "", password = "", sessionId = "", industry = "restaurant" } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required." });
   }
@@ -25,6 +42,7 @@ router.post("/register", async (req, res) => {
     name: name.trim(),
     email: email.toLowerCase().trim(),
     passwordHash: await hashPassword(password),
+    industry: normalizeIndustry(industry),
     role:
       process.env.ADMIN_EMAIL &&
       email.toLowerCase().trim() === process.env.ADMIN_EMAIL.toLowerCase().trim()

@@ -1,3 +1,5 @@
+import { getPrompt } from "../../../lib/industry-prompts";
+
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
 
@@ -94,8 +96,12 @@ export async function POST(req) {
   }
 
   const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
+  const industry = access.data?.user?.industry || "restaurant";
+  const industrySystem = getPrompt(industry);
+  const extraSystem = typeof body.system === "string" ? body.system : "";
   const payload = {
     ...body,
+    system: extraSystem ? `${industrySystem}\n\n${extraSystem}` : industrySystem,
     model: requestedModel || DEFAULT_MODEL,
   };
 

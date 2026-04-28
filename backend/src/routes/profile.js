@@ -5,6 +5,19 @@ const User = require("../models/User");
 
 const router = express.Router();
 
+const ALLOWED_INDUSTRIES = new Set([
+  "restaurant",
+  "pawnshop",
+  "auto_shop",
+  "retail",
+  "salon",
+  "cleaning",
+  "contractor",
+  "food_truck",
+  "landscaping",
+  "gym",
+]);
+
 router.get("/me", requireAuth, async (req, res) => {
   const user = await getUserById(req.auth.sub);
   if (!user) {
@@ -15,13 +28,16 @@ router.get("/me", requireAuth, async (req, res) => {
 });
 
 router.patch("/me", requireAuth, async (req, res) => {
-  const { name = "" } = req.body || {};
+  const { name = "", industry = "" } = req.body || {};
   const user = await getUserById(req.auth.sub);
   if (!user) {
     return res.status(404).json({ error: "User not found." });
   }
 
   user.name = name.trim();
+  if (industry && ALLOWED_INDUSTRIES.has(industry)) {
+    user.industry = industry;
+  }
   await user.save();
 
   return res.json({ profile: serializeUser(user) });

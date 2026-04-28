@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageShell, GoldButton } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
+import { INDUSTRY_OPTIONS } from "../../lib/industry-prompts";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register, isAuthenticated, profileLoading } = useSteady();
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", industry: "restaurant" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +50,18 @@ export default function RegisterPage() {
           <input value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} placeholder="Full name" style={inputStyle} />
           <input value={form.email} onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))} placeholder="Email" style={inputStyle} />
           <input type="password" value={form.password} onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))} placeholder="Password" style={inputStyle} />
+          <select
+            value={form.industry}
+            onChange={(e) => setForm((c) => ({ ...c, industry: e.target.value }))}
+            style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
+            aria-label="Industry"
+          >
+            {INDUSTRY_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           {error && <div style={errorStyle}>{error}</div>}
           <GoldButton onClick={handleSubmit} disabled={loading} style={{ width: "100%", minHeight: "48px" }}>{loading ? "Creating account..." : "Create Account"}</GoldButton>
           <div style={{ marginTop: "14px", color: "#6A6058", fontSize: "14px" }}>Already have an account? <Link href="/login" style={{ color: "#C8A96E" }}>Sign in</Link></div>

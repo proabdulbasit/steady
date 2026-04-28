@@ -4,17 +4,23 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GoldButton, PageShell } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
+import { INDUSTRY_OPTIONS } from "../../lib/industry-prompts";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { isAuthenticated, profile, saveProfile, logout, profileLoading } = useSteady();
   const [name, setName] = useState("");
+  const [industry, setIndustry] = useState("restaurant");
   const [saving, setSaving] = useState(false);
   const isUnlimited = profile.questionsRemaining === null;
 
   useEffect(() => {
     setName(profile.name || "");
   }, [profile.name]);
+
+  useEffect(() => {
+    setIndustry(profile.industry || "restaurant");
+  }, [profile.industry]);
 
   useEffect(() => {
     if (!profileLoading && !isAuthenticated) {
@@ -29,14 +35,25 @@ export default function ProfilePage() {
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "16px" }}>
         <div style={cardStyle}>
           <div style={headingStyle}>Account</div>
-          <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" style={inputStyle} />
           <input value={profile.email} disabled style={{ ...inputStyle, opacity: 0.7 }} />
-          <div style={{ color: "#6A6058", marginBottom: "16px" }}>Role: {profile.role}</div>
+          <select
+            value={industry}
+            onChange={(e) => setIndustry(e.target.value)}
+            style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
+            aria-label="Industry"
+          >
+            {INDUSTRY_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <div style={{ display: "flex", gap: "10px" }}>
             <GoldButton
               onClick={async () => {
                 setSaving(true);
-                await saveProfile({ name });
+                await saveProfile({ name, industry });
                 setSaving(false);
               }}
               disabled={saving}

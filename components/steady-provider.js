@@ -14,6 +14,7 @@ const EMPTY_PROFILE = {
   name: "",
   email: "",
   role: "guest",
+  industry: "restaurant",
   planId: PLAN_IDS.FREE,
   planName: "Free",
   planSelected: false,

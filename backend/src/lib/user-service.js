@@ -52,6 +52,7 @@ function serializeUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    industry: user.industry || "restaurant",
     planId: plan.id,
     planName: plan.name,
     planSelected: user.planSelected !== false,
