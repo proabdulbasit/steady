@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema(
         "food_truck",
         "landscaping",
         "gym",
+        "other",
       ],
       default: "restaurant",
       index: true,
@@ -52,6 +53,8 @@ const userSchema = new mongoose.Schema(
     usage: { type: usageSchema, default: null },
     integrations: { type: [integrationsSchema], default: [] },
     lastCheckoutSessionId: { type: String, default: "" },
+    passwordResetTokenHash: { type: String, default: "" },
+    passwordResetExpires: { type: Date, default: null },
   },
   { timestamps: true }
 );

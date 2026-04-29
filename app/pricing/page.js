@@ -7,7 +7,7 @@ import { useSteady } from "../../components/steady-provider";
 import { PLAN_IDS } from "../../lib/plans";
 
 const plans = [
-  { id: PLAN_IDS.FREE, name: "Free", price: "Free", subtitle: "For trying Steady out", features: ["5 questions per day", "Core business advice", "Guest access supported"] },
+  { id: PLAN_IDS.FREE, name: "Free", price: "Free", subtitle: "For trying Steady out", features: ["3 questions per day", "Core business advice", "Guest access supported"] },
   { id: PLAN_IDS.PRO, name: "Pro", price: "$20/mo", subtitle: "200 questions/month and premium tools", features: ["200 questions per month", "Business Audit", "Cost Savings Calculator", "Action Plan Builder"] },
   { id: PLAN_IDS.BUSINESS, name: "Business", price: "$69/mo", subtitle: "Everything in Pro plus integrations", features: ["Unlimited questions", "Business Audit", "Cost Savings Calculator", "Action Plan Builder", "Legal Document Translator", "PDF Export", "Data integrations coming soon"] },
 ];

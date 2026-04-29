@@ -16,6 +16,7 @@ const ALLOWED_INDUSTRIES = new Set([
   "food_truck",
   "landscaping",
   "gym",
+  "other",
 ]);
 
 router.get("/me", requireAuth, async (req, res) => {

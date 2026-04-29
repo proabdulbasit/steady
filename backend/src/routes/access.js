@@ -21,8 +21,8 @@ router.get("/status/:sessionId", optionalAuth, async (req, res) => {
     subscriptionStatus: "inactive",
     currentPeriodEnd: null,
     questionsUsed: 0,
-    questionsRemaining: 5,
-    dailyQuestionLimit: 5,
+    questionsRemaining: 3,
+    dailyQuestionLimit: 3,
     features: {
       premiumTools: false,
       dataIntegrations: false,

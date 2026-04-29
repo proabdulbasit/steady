@@ -48,6 +48,11 @@ export default function LoginPage() {
         <div style={authCard}>
           <input value={form.email} onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))} placeholder="Email" style={inputStyle} />
           <input type="password" value={form.password} onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))} placeholder="Password" style={inputStyle} />
+          <div style={{ textAlign: "right", marginBottom: "10px" }}>
+            <Link href="/forgot-password" style={{ color: "#8A8068", fontSize: "13px" }}>
+              Forgot password?
+            </Link>
+          </div>
           {error && <div style={errorStyle}>{error}</div>}
           <GoldButton onClick={handleSubmit} disabled={loading} style={{ width: "100%", minHeight: "48px" }}>{loading ? "Signing in..." : "Sign In"}</GoldButton>
           <div style={{ marginTop: "14px", color: "#6A6058", fontSize: "14px" }}>Need an account? <Link href="/register" style={{ color: "#C8A96E" }}>Register</Link></div>

@@ -1,13 +1,23 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { fetchAdminUsers, fetchMe, fetchProfile, loginUser, registerUser, updateProfile } from "../lib/auth-client";
+import {
+  changePassword as changePasswordRequest,
+  fetchAdminUsers,
+  fetchMe,
+  fetchProfile,
+  loginUser,
+  registerUser,
+  resetPassword as resetPasswordRequest,
+  requestForgotPassword,
+  updateProfile,
+} from "../lib/auth-client";
 import { clearAuthSession, getStoredAuthToken, getStoredUser, storeAuthSession } from "../lib/auth-storage";
 import { changePlan, createPortalSession, fetchSubscriptionStatus, redirectToCheckout, syncCheckoutSession } from "../lib/billing-client";
 import { PLAN_IDS } from "../lib/plans";
 import { getOrCreateSessionId } from "../lib/session";
 
-const FREE_LIMIT = 5;
+const FREE_LIMIT = 3;
 
 const EMPTY_PROFILE = {
   id: "",
@@ -129,6 +139,21 @@ export function SteadyProvider({ children }) {
     return result;
   }
 
+  async function forgotPassword(email) {
+    return requestForgotPassword(email);
+  }
+
+  async function completePasswordReset(payload) {
+    const result = await resetPasswordRequest({ ...payload, sessionId });
+    setAuthToken(result.token);
+    syncProfile(result.user, result.token);
+    return result;
+  }
+
+  async function changePassword(form) {
+    return changePasswordRequest(authToken, form);
+  }
+
   async function saveProfile(payload) {
     const result = await updateProfile(authToken, payload);
     syncProfile(result.profile);
@@ -235,6 +260,9 @@ export function SteadyProvider({ children }) {
       remainingQuestions: profile.questionsRemaining === null ? null : (profile.questionsRemaining ?? FREE_LIMIT),
       login,
       register,
+      forgotPassword,
+      completePasswordReset,
+      changePassword,
       logout,
       saveProfile,
       refreshProfile,

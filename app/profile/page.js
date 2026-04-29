@@ -8,10 +8,15 @@ import { INDUSTRY_OPTIONS } from "../../lib/industry-prompts";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, profile, saveProfile, logout, profileLoading } = useSteady();
+  const { isAuthenticated, profile, saveProfile, logout, profileLoading, changePassword } = useSteady();
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("restaurant");
   const [saving, setSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwdMsg, setPwdMsg] = useState("");
+  const [pwdSaving, setPwdSaving] = useState(false);
   const isUnlimited = profile.questionsRemaining === null;
 
   useEffect(() => {
@@ -62,6 +67,75 @@ export default function ProfilePage() {
             </GoldButton>
             <button onClick={logout} style={secondaryButton}>Log Out</button>
           </div>
+          <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid #252018" }}>
+            <div style={{ ...headingStyle, fontSize: "18px", marginBottom: "10px" }}>Password</div>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Current password"
+              style={inputStyle}
+              autoComplete="current-password"
+            />
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="New password"
+              style={inputStyle}
+              autoComplete="new-password"
+            />
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm new password"
+              style={inputStyle}
+              autoComplete="new-password"
+            />
+            {pwdMsg && (
+              <div
+                style={{
+                  ...(pwdMsg.startsWith("Error") ? errorStyle : successStyle),
+                  marginBottom: "10px",
+                }}
+              >
+                {pwdMsg}
+              </div>
+            )}
+            <GoldButton
+              onClick={async () => {
+                setPwdMsg("");
+                if (!currentPassword || !newPassword) {
+                  setPwdMsg("Error: Fill in current and new passwords.");
+                  return;
+                }
+                if (newPassword.length < 6) {
+                  setPwdMsg("Error: New password must be at least 6 characters.");
+                  return;
+                }
+                if (newPassword !== confirmPassword) {
+                  setPwdMsg("Error: New passwords do not match.");
+                  return;
+                }
+                setPwdSaving(true);
+                try {
+                  await changePassword({ currentPassword, newPassword });
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setPwdMsg("Password updated.");
+                } catch (err) {
+                  setPwdMsg(`Error: ${err.message || "Could not update password."}`);
+                } finally {
+                  setPwdSaving(false);
+                }
+              }}
+              disabled={pwdSaving}
+            >
+              {pwdSaving ? "Updating..." : "Update password"}
+            </GoldButton>
+          </div>
         </div>
         <div style={cardStyle}>
           <div style={headingStyle}>Plan & Usage</div>
@@ -82,3 +156,17 @@ const headingStyle = { fontSize: "22px", color: "#E8DFD0", marginBottom: "12px" 
 const inputStyle = { width: "100%", boxSizing: "border-box", background: "#191510", border: "1px solid #2A2520", borderRadius: "10px", padding: "12px 14px", color: "#E8DFD0", fontSize: "14px", fontFamily: "inherit", marginBottom: "10px" };
 const statLine = { fontSize: "14px", color: "#D4C9B8", marginBottom: "8px" };
 const secondaryButton = { background: "none", border: "1px solid #2A2520", color: "#8A7E70", borderRadius: "10px", padding: "14px 18px", cursor: "pointer", fontFamily: "inherit" };
+const errorStyle = {
+  background: "rgba(229,115,115,0.08)",
+  border: "1px solid rgba(229,115,115,0.25)",
+  color: "#F1B1B1",
+  borderRadius: "12px",
+  padding: "12px 14px",
+};
+const successStyle = {
+  background: "rgba(120,176,140,0.1)",
+  border: "1px solid rgba(120,176,140,0.35)",
+  color: "#C5E8CC",
+  borderRadius: "12px",
+  padding: "12px 14px",
+};

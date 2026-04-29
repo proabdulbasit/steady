@@ -87,7 +87,7 @@ export async function POST(req) {
           message: access.data?.error || "Access denied.",
           planId: access.data?.planId || "free",
           questionsRemaining: access.data?.questionsRemaining ?? 0,
-          dailyLimit: access.data?.dailyLimit ?? 5,
+          dailyLimit: access.data?.dailyLimit ?? 3,
           features: access.data?.features || {},
         },
       },

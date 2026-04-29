@@ -12,7 +12,7 @@ const PLAN_CONFIG = {
   [PLAN_IDS.FREE]: {
     id: PLAN_IDS.FREE,
     name: "Free",
-    dailyQuestionLimit: 5,
+    dailyQuestionLimit: 3,
     unlimitedQuestions: false,
     priceId: null,
     features: {
