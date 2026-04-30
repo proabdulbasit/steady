@@ -14,6 +14,7 @@ const accessRoutes = require("./routes/access");
 const webhookRoutes = require("./routes/webhook");
 const authRoutes = require("./routes/auth");
 const profileRoutes = require("./routes/profile");
+const conversationRoutes = require("./routes/conversations");
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -26,11 +27,14 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/billing/webhook", webhookRoutes);
-app.use(express.json());
+// Allow larger JSON bodies (chat attachments are stored as base64).
+app.use(express.json({ limit: "12mb" }));
+app.use(express.urlencoded({ extended: true, limit: "12mb" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/access", accessRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 app.use((error, _req, res, _next) => {
   const status = error.status || 500;

@@ -64,6 +64,74 @@ async function callSteadyApi({ sessionId, authToken, system, messages, max_token
   return data;
 }
 
+async function callSteadyApiStream({ sessionId, authToken, system, messages, max_tokens, onText }) {
+  const res = await fetch("/api/anthropic", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-steady-session-id": sessionId,
+      ...(authToken ? { "x-steady-auth-token": authToken } : {}),
+    },
+    body: JSON.stringify({ system, messages, max_tokens, stream: true }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const error = new Error(data?.error?.message || data?.message || "Request failed.");
+    error.details = data?.error || {};
+    throw error;
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) {
+    throw new Error("Streaming not supported by the browser.");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let fullText = "";
+
+  function handleEventData(json) {
+    if (!json || typeof json !== "object") return;
+    // Anthropic SSE events: content_block_delta with text_delta
+    if (json.type === "content_block_delta" && json.delta?.type === "text_delta" && typeof json.delta?.text === "string") {
+      const delta = json.delta.text;
+      fullText += delta;
+      onText?.(delta, fullText);
+    }
+  }
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE events are separated by double newlines.
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const rawEvent = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+
+      const lines = rawEvent.split("\n");
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          handleEventData(JSON.parse(payload));
+        } catch {
+          // ignore malformed data
+        }
+      }
+    }
+  }
+
+  return {
+    content: [{ text: fullText }],
+  };
+}
+
 export function SteadyProvider({ children }) {
   const [sessionId, setSessionId] = useState("");
   const [authToken, setAuthToken] = useState("");
@@ -241,6 +309,20 @@ export function SteadyProvider({ children }) {
     return data;
   }
 
+  async function runAssistantRequestStream({ system, prompt, messages, maxTokens = 2000, onText }) {
+    // For streaming we prioritize UX; steadyAccess profile sync will update on next refresh.
+    const data = await callSteadyApiStream({
+      sessionId,
+      authToken,
+      system,
+      messages: messages || [{ role: "user", content: prompt }],
+      max_tokens: maxTokens,
+      onText,
+    });
+
+    return data;
+  }
+
   async function getAdminUsers() {
     const result = await fetchAdminUsers(authToken);
     return result.users || [];
@@ -269,6 +351,7 @@ export function SteadyProvider({ children }) {
       choosePlan,
       updatePlan,
       runAssistantRequest,
+      runAssistantRequestStream,
       getAdminUsers,
       clearBillingError: () => setBillingError(""),
       syncCheckout,

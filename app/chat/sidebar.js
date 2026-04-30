@@ -1,0 +1,616 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useChatHistory } from "./chat-history-context";
+import { deleteConversation, updateConversation } from "../../lib/chat-client";
+import { useSteady } from "../../components/steady-provider";
+
+export default function ChatSidebar() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeId = searchParams?.get("c") || "";
+  const { conversations, loading, createNewChat, refresh } = useChatHistory();
+  const { authToken } = useSteady();
+  const [menuForId, setMenuForId] = useState("");
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [menuChat, setMenuChat] = useState(null);
+  const [toast, setToast] = useState("");
+  const toastTimerRef = useRef(null);
+  const [shareChat, setShareChat] = useState(null); // { id, title }
+  const [renameChat, setRenameChat] = useState(null); // { id, title, nextTitle }
+  const [deleteChat, setDeleteChat] = useState(null); // { id, title }
+
+  const items = useMemo(() => conversations || [], [conversations]);
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        setMenuForId("");
+        setShareChat(null);
+        setRenameChat(null);
+        setDeleteChat(null);
+      }
+    }
+    function onClickOutside(e) {
+      if (!menuForId) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-chat-menu-root]")) return;
+      if (target.closest("[data-chat-floating-menu]")) return;
+      setMenuForId("");
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onClickOutside);
+    };
+  }, [menuForId]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  function showToast(message) {
+    setToast(message);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(""), 1600);
+  }
+
+  function openShareModal(chat) {
+    setShareChat({ id: chat.id, title: chat.title || "New chat" });
+    setMenuForId("");
+  }
+
+  function openRenameModal(chat) {
+    const t = chat.title || "New chat";
+    setRenameChat({ id: chat.id, title: t, nextTitle: t });
+    setMenuForId("");
+  }
+
+  function openDeleteModal(chat) {
+    setDeleteChat({ id: chat.id, title: chat.title || "New chat" });
+    setMenuForId("");
+  }
+
+  async function copyShareLink(id) {
+    const url = `${window.location.origin}/chat?c=${encodeURIComponent(id)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast("Link copied");
+    } catch {
+      showToast("Could not copy link");
+    }
+  }
+
+  async function submitRename() {
+    if (!renameChat?.id) return;
+    const title = String(renameChat.nextTitle || "").trim();
+    if (!title) return;
+    try {
+      await updateConversation(authToken, renameChat.id, { title });
+      showToast("Renamed");
+      await refresh();
+      setRenameChat(null);
+    } catch (e) {
+      showToast(e?.message || "Rename failed");
+    }
+  }
+
+  async function onTogglePin(id, pinned) {
+    try {
+      await updateConversation(authToken, id, { pinned: !pinned });
+      showToast(!pinned ? "Pinned" : "Unpinned");
+      await refresh();
+    } catch (e) {
+      showToast(e?.message || "Pin failed");
+    } finally {
+      setMenuForId("");
+    }
+  }
+
+  async function submitDelete() {
+    if (!deleteChat?.id) return;
+    try {
+      await deleteConversation(authToken, deleteChat.id);
+      showToast("Deleted");
+      if (activeId === deleteChat.id) router.push("/chat");
+      await refresh();
+      setDeleteChat(null);
+    } catch (e) {
+      showToast(e?.message || "Delete failed");
+    }
+  }
+
+  useEffect(() => {
+    if (!menuForId) {
+      setMenuAnchor(null);
+      setMenuChat(null);
+    }
+  }, [menuForId]);
+
+  return (
+    <aside
+      className="steady-chat-sidebar"
+      style={{
+        width: "280px",
+        flexShrink: 0,
+        borderRight: "1px solid #1E1A15",
+        background: "rgba(12,10,8,0.98)",
+        position: "sticky",
+        top: 0,
+        height: "100vh",
+        overflow: "visible",
+      }}
+    >
+      <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid #1E1A15" }}>
+        <button
+          onClick={createNewChat}
+          style={{
+            width: "100%",
+            border: "1px solid #2A2520",
+            background: "rgba(255,255,255,0.02)",
+            color: "#E8DFD0",
+            borderRadius: "12px",
+            padding: "12px 12px",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            fontSize: "14px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>New chat</span>
+          <span aria-hidden="true" style={{ color: "#C8A96E", fontSize: "18px", lineHeight: 1 }}>
+            +
+          </span>
+        </button>
+      </div>
+
+      <div style={{ padding: "10px 10px 14px", height: "calc(100vh - 66px)", overflowY: "auto" }}>
+        <div style={{ fontSize: "10px", letterSpacing: "2px", textTransform: "uppercase", color: "#6A6058", padding: "6px 6px 10px" }}>
+          Recent chats
+        </div>
+
+        {loading ? (
+          <div style={{ color: "#6A6058", fontSize: "13px", padding: "8px 6px" }}>Loading…</div>
+        ) : items.length ? (
+          <div style={{ display: "grid", gap: "6px" }}>
+            {items.map((c) => {
+              const isActive = activeId && c.id === activeId;
+              return (
+                <div
+                  key={c.id}
+                  data-chat-menu-root
+                  style={{
+                    position: "relative",
+                    border: isActive ? "1px solid rgba(200,169,110,0.4)" : "1px solid #1F1A15",
+                    background: isActive ? "rgba(200,169,110,0.10)" : "rgba(255,255,255,0.01)",
+                    color: isActive ? "#C8A96E" : "#D4C9B8",
+                    borderRadius: "12px",
+                    overflow: "visible",
+                  }}
+                >
+                  <button
+                    onClick={() => router.push(`/chat?c=${encodeURIComponent(c.id)}`)}
+                    className="steady-chat-item"
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      background: "transparent",
+                      border: "none",
+                      color: "inherit",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontSize: "13px",
+                      lineHeight: "1.25",
+                      padding: "10px 36px 10px 10px",
+                      display: "grid",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      {c.pinned ? <span title="Pinned" aria-hidden="true" style={{ color: "#C8A96E" }}>📌</span> : null}
+                      <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "New chat"}</div>
+                    </div>
+                    {c.lastMessagePreview ? (
+                      <div style={{ color: isActive ? "rgba(200,169,110,0.8)" : "#6A6058", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {c.lastMessagePreview}
+                      </div>
+                    ) : null}
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-label="Chat options"
+                    className="steady-chat-kebab"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const next = menuForId === c.id ? "" : c.id;
+                      if (next) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setMenuAnchor({
+                          top: rect.top,
+                          right: rect.right,
+                          bottom: rect.bottom,
+                          left: rect.left,
+                          width: rect.width,
+                          height: rect.height,
+                        });
+                        setMenuChat({ id: c.id, title: c.title, pinned: Boolean(c.pinned) });
+                      }
+                      setMenuForId(next);
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: "8px",
+                      right: "8px",
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "10px",
+                      border: "1px solid #2A2520",
+                      background: isActive ? "rgba(200,169,110,0.12)" : "rgba(255,255,255,0.02)",
+                      color: isActive ? "#C8A96E" : "#D4C9B8",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: menuForId === c.id ? 1 : 0,
+                      pointerEvents: menuForId === c.id ? "auto" : "none",
+                      transition: "opacity 120ms ease",
+                    }}
+                  >
+                    …
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ color: "#6A6058", fontSize: "13px", padding: "8px 6px", lineHeight: 1.5 }}>
+            No chats yet.
+            <br />
+            Start a new one.
+          </div>
+        )}
+      </div>
+
+      {menuForId && menuAnchor && menuChat ? (
+        <div
+          data-chat-floating-menu
+          role="menu"
+          aria-label="Chat options"
+          style={{
+            position: "fixed",
+            top: Math.max(8, menuAnchor.top - 2),
+            left: menuAnchor.right + 12,
+            width: "220px",
+            borderRadius: "14px",
+            border: "1px solid #2A2520",
+            background: "#0F0D0A",
+            boxShadow: "0 18px 60px rgba(0,0,0,0.55)",
+            padding: "8px",
+            zIndex: 9999,
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <MenuItem label="Share" onClick={() => openShareModal(menuChat)} />
+          <MenuItem label="Rename" onClick={() => openRenameModal(menuChat)} />
+          <MenuItem
+            label={menuChat.pinned ? "Unpin chat" : "Pin chat"}
+            onClick={() => onTogglePin(menuChat.id, Boolean(menuChat.pinned))}
+          />
+          <div style={{ height: "1px", background: "#1E1A15", margin: "8px 0" }} />
+          <MenuItem label="Delete" danger onClick={() => openDeleteModal(menuChat)} />
+        </div>
+      ) : null}
+
+      {shareChat ? (
+        <Modal title={shareChat.title} onClose={() => setShareChat(null)} footer={null}>
+          <div style={{ display: "grid", gap: "12px" }}>
+            <div style={{ fontSize: "13px", color: "#6A6058" }}>Share this chat</div>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <input
+                readOnly
+                value={`${typeof window !== "undefined" ? window.location.origin : ""}/chat?c=${encodeURIComponent(shareChat.id)}`}
+                style={{
+                  flex: 1,
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid #2A2520",
+                  borderRadius: "12px",
+                  padding: "12px 12px",
+                  color: "#E8DFD0",
+                  fontFamily: "inherit",
+                  fontSize: "13px",
+                }}
+              />
+              <button type="button" onClick={() => copyShareLink(shareChat.id)} style={secondaryButtonStyle}>
+                Copy link
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: "18px", justifyContent: "center", paddingTop: "6px" }}>
+              <ShareCircle
+                label="X"
+                onClick={() => {
+                  const url = `${window.location.origin}/chat?c=${encodeURIComponent(shareChat.id)}`;
+                  window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`, "_blank", "noopener,noreferrer");
+                }}
+              />
+              <ShareCircle
+                label="in"
+                onClick={() => {
+                  const url = `${window.location.origin}/chat?c=${encodeURIComponent(shareChat.id)}`;
+                  window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, "_blank", "noopener,noreferrer");
+                }}
+              />
+              <ShareCircle
+                label="r"
+                onClick={() => {
+                  const url = `${window.location.origin}/chat?c=${encodeURIComponent(shareChat.id)}`;
+                  window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(url)}`, "_blank", "noopener,noreferrer");
+                }}
+              />
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {renameChat ? (
+        <Modal
+          title="Rename chat"
+          onClose={() => setRenameChat(null)}
+          footer={
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button type="button" onClick={() => setRenameChat(null)} style={secondaryButtonStyle}>
+                Cancel
+              </button>
+              <button type="button" onClick={submitRename} style={primaryButtonStyle}>
+                Save
+              </button>
+            </div>
+          }
+        >
+          <div style={{ display: "grid", gap: "10px" }}>
+            <div style={{ fontSize: "13px", color: "#6A6058" }}>Chat name</div>
+            <input
+              autoFocus
+              value={renameChat.nextTitle}
+              onChange={(e) => setRenameChat((c) => ({ ...c, nextTitle: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitRename();
+              }}
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid #2A2520",
+                borderRadius: "12px",
+                padding: "12px 12px",
+                color: "#E8DFD0",
+                fontFamily: "inherit",
+                fontSize: "14px",
+              }}
+            />
+          </div>
+        </Modal>
+      ) : null}
+
+      {deleteChat ? (
+        <Modal
+          title="Delete chat?"
+          onClose={() => setDeleteChat(null)}
+          footer={
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button type="button" onClick={() => setDeleteChat(null)} style={secondaryButtonStyle}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitDelete}
+                style={{
+                  ...primaryButtonStyle,
+                  background: "linear-gradient(135deg,#E45A5A,#B83C3C)",
+                  color: "#0F0D0A",
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          }
+        >
+          <div style={{ color: "#D4C9B8", lineHeight: 1.6 }}>
+            This will delete <span style={{ fontWeight: 700, color: "#E8DFD0" }}>{deleteChat.title}</span>.
+            <div style={{ marginTop: "8px", color: "#6A6058", fontSize: "13px" }}>This cannot be undone.</div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {toast ? (
+        <div
+          style={{
+            position: "fixed",
+            left: "16px",
+            bottom: "16px",
+            width: "248px",
+            background: "rgba(20,16,12,0.95)",
+            border: "1px solid #2A2520",
+            color: "#E8DFD0",
+            borderRadius: "14px",
+            padding: "10px 12px",
+            fontSize: "13px",
+            boxShadow: "0 18px 60px rgba(0,0,0,0.55)",
+            zIndex: 80,
+          }}
+        >
+          {toast}
+        </div>
+      ) : null}
+
+      <style>{`
+        @media (max-width: 960px){
+          .steady-chat-sidebar{display:none !important}
+        }
+
+        [data-chat-menu-root]:hover .steady-chat-kebab{
+          opacity: 1 !important;
+          pointer-events: auto !important;
+        }
+      `}</style>
+    </aside>
+  );
+}
+
+function MenuItem({ label, onClick, danger = false }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        border: "1px solid transparent",
+        background: "transparent",
+        color: danger ? "#E45A5A" : "#E8DFD0",
+        borderRadius: "10px",
+        padding: "10px 10px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        fontSize: "14px",
+      }}
+      onMouseOver={(e) => {
+        e.currentTarget.style.background = danger ? "rgba(228,90,90,0.08)" : "rgba(255,255,255,0.04)";
+        e.currentTarget.style.borderColor = danger ? "rgba(228,90,90,0.22)" : "#2A2520";
+      }}
+      onMouseOut={(e) => {
+        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.borderColor = "transparent";
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Modal({ title, onClose, children, footer }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        zIndex: 10000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          width: "min(560px, 94vw)",
+          background: "#0F0D0A",
+          border: "1px solid #2A2520",
+          borderRadius: "18px",
+          boxShadow: "0 30px 110px rgba(0,0,0,0.65)",
+          overflow: "hidden",
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            padding: "16px 16px 12px",
+            borderBottom: "1px solid #1E1A15",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+          }}
+        >
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "#E8DFD0" }}>{title}</div>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "12px",
+              border: "1px solid #2A2520",
+              background: "rgba(255,255,255,0.02)",
+              color: "#D4C9B8",
+              cursor: "pointer",
+              fontSize: "18px",
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{ padding: "16px" }}>{children}</div>
+        {footer ? <div style={{ padding: "14px 16px 16px", borderTop: "1px solid #1E1A15" }}>{footer}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function ShareCircle({ label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: "64px",
+        height: "64px",
+        borderRadius: "999px",
+        border: "1px solid #2A2520",
+        background: "rgba(255,255,255,0.02)",
+        color: "#E8DFD0",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        fontWeight: 700,
+        fontSize: "18px",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+const secondaryButtonStyle = {
+  border: "1px solid #2A2520",
+  background: "rgba(255,255,255,0.02)",
+  color: "#E8DFD0",
+  borderRadius: "12px",
+  padding: "12px 14px",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  fontSize: "14px",
+};
+
+const primaryButtonStyle = {
+  border: "none",
+  background: "linear-gradient(135deg,#C8A96E,#A07840)",
+  color: "#0F0D0A",
+  borderRadius: "12px",
+  padding: "12px 14px",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  fontSize: "14px",
+  fontWeight: 700,
+};
+

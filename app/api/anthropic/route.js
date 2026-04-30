@@ -25,6 +25,21 @@ async function requestAnthropic(apiKey, body) {
   return { upstream, json };
 }
 
+async function requestAnthropicStream(apiKey, body) {
+  const upstream = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "text/event-stream",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({ ...body, stream: true }),
+  });
+
+  return upstream;
+}
+
 async function authorizeAccess(sessionId, authToken = "", consume = false) {
   if (!BACKEND_URL) {
     throw new Error("Missing NEXT_PUBLIC_BACKEND_URL or BACKEND_URL.");
@@ -104,6 +119,49 @@ export async function POST(req) {
     system: extraSystem ? `${industrySystem}\n\n${extraSystem}` : industrySystem,
     model: requestedModel || DEFAULT_MODEL,
   };
+
+  const wantsStream = body?.stream === true;
+
+  if (wantsStream) {
+    let upstream = await requestAnthropicStream(apiKey, payload);
+
+    if (upstream.status === 404 && payload.model !== DEFAULT_MODEL) {
+      upstream = await requestAnthropicStream(apiKey, { ...payload, model: DEFAULT_MODEL });
+    }
+
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => "");
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = { error: { message: text || "Upstream returned non-JSON response." } };
+      }
+      return Response.json(
+        {
+          ...json,
+          steadyAccess: access.data,
+        },
+        { status: upstream.status }
+      );
+    }
+
+    // Consume after we know upstream accepted the request.
+    authorizeAccess(sessionId, authToken, true)
+      .then((consumptionResult) => {
+        if (consumptionResult.ok) access.data = consumptionResult.data;
+      })
+      .catch(() => null);
+
+    return new Response(upstream.body, {
+      status: 200,
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+      },
+    });
+  }
 
   let { upstream, json } = await requestAnthropic(apiKey, payload);
 
