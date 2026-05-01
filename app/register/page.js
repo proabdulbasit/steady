@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PageShell, GoldButton } from "../../components/steady-ui";
+import { GoldButton } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
 import { INDUSTRY_OPTIONS } from "../../lib/industry-prompts";
 
@@ -16,12 +16,11 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (profileLoading) return;
-    if (isAuthenticated) {
-      router.replace("/pricing");
-    }
+    if (isAuthenticated) router.replace("/pricing");
   }, [isAuthenticated, profileLoading, router]);
 
-  async function handleSubmit() {
+  async function handleSubmit(e) {
+    e?.preventDefault?.();
     setLoading(true);
     setError("");
     try {
@@ -35,55 +34,62 @@ export default function RegisterPage() {
   }
 
   return (
-    <PageShell center eyebrow="Register" title="Create your Steady account" description="Use a real account so subscriptions and usage tracking stay attached to you, not one browser session.">
-      <div className="auth-layout" style={{ width: "100%", display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "18px", alignItems: "stretch" }}>
-        <div style={panelStyle}>
-          <div style={panelTitle}>What you get</div>
-          <div style={panelText}>A professional account structure with saved profile, persistent subscription state, plan controls, and access to premium tools when you upgrade.</div>
-          <div style={featureGrid}>
-            {["Personal profile page", "Saved plan and usage stats", "Stripe-linked account billing", "Business integrations on the right plan"].map((item) => (
-              <div key={item} style={featureItem}>{item}</div>
+    <main className="container" style={{ padding: "64px 24px 96px" }}>
+      <div className="auth-split">
+        <aside className="auth-side">
+          <div>
+            <div className="eyebrow" style={{ color: "var(--gold-2)", marginBottom: 14 }}>Create your account</div>
+            <h1 className="h2 serif" style={{ color: "#F1E7D7", margin: "0 0 14px" }}>
+              Steady — built around your business, not a browser session.
+            </h1>
+            <p style={{ color: "rgba(241,231,215,0.78)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
+              An account keeps your subscription, daily usage and saved chats attached to you across every device.
+            </p>
+          </div>
+          <div style={{ display: "grid", gap: 10, marginTop: 28 }}>
+            {["Personal profile and plan", "Saved usage stats", "Stripe-linked billing", "Industry-aware answers from day one"].map((i) => (
+              <div key={i} style={{ fontSize: 13, color: "rgba(241,231,215,0.85)", display: "flex", gap: 10, alignItems: "center" }}>
+                <span style={{ color: "var(--gold-2)" }}>✓</span> {i}
+              </div>
             ))}
           </div>
-        </div>
-        <div style={authCard}>
-          <input value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} placeholder="Full name" style={inputStyle} />
-          <input value={form.email} onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))} placeholder="Email" style={inputStyle} />
-          <input type="password" value={form.password} onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))} placeholder="Password" style={inputStyle} />
-          <select
-            value={form.industry}
-            onChange={(e) => setForm((c) => ({ ...c, industry: e.target.value }))}
-            style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
-            aria-label="Industry"
-          >
+        </aside>
+
+        <form onSubmit={handleSubmit} className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: 36 }}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>Register</div>
+          <h2 className="h3 serif" style={{ margin: "0 0 22px" }}>Get started in under a minute</h2>
+
+          <label className="label" htmlFor="name">Full name</label>
+          <input id="name" value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} placeholder="Jane Owner" className="input" style={{ marginBottom: 12 }} />
+
+          <label className="label" htmlFor="email">Email</label>
+          <input id="email" type="email" autoComplete="email" value={form.email} onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))} placeholder="you@business.com" className="input" style={{ marginBottom: 12 }} />
+
+          <label className="label" htmlFor="password">Password</label>
+          <input id="password" type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))} placeholder="At least 8 characters" className="input" style={{ marginBottom: 12 }} />
+
+          <label className="label" htmlFor="industry">Industry</label>
+          <select id="industry" value={form.industry} onChange={(e) => setForm((c) => ({ ...c, industry: e.target.value }))} className="input select" style={{ appearance: "none", cursor: "pointer", marginBottom: 14 }}>
             {INDUSTRY_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
+              <option key={opt.id} value={opt.id}>{opt.label}</option>
             ))}
           </select>
-          {error && <div style={errorStyle}>{error}</div>}
-          <GoldButton onClick={handleSubmit} disabled={loading} style={{ width: "100%", minHeight: "48px" }}>{loading ? "Creating account..." : "Create Account"}</GoldButton>
-          <div style={{ marginTop: "14px", color: "#6A6058", fontSize: "14px" }}>Already have an account? <Link href="/login" style={{ color: "#C8A96E" }}>Sign in</Link></div>
-        </div>
+
+          {error && (
+            <div style={{ background: "var(--danger-soft)", border: "1px solid var(--danger)", color: "var(--danger)", borderRadius: 12, padding: "10px 14px", marginBottom: 12, fontSize: 14 }}>
+              {error}
+            </div>
+          )}
+
+          <GoldButton type="submit" disabled={loading} style={{ width: "100%" }}>
+            {loading ? "Creating account..." : "Create account →"}
+          </GoldButton>
+
+          <div style={{ marginTop: 16, color: "var(--ink-3)", fontSize: 14, textAlign: "center" }}>
+            Already have an account? <Link href="/login" style={{ color: "var(--gold)", fontWeight: 600 }}>Sign in</Link>
+          </div>
+        </form>
       </div>
-      <style>{responsiveAuthCss}</style>
-    </PageShell>
+    </main>
   );
 }
-
-const authCard = { padding: "24px", background: "#15120E", border: "1px solid #252018", borderRadius: "16px", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" };
-const inputStyle = { width: "100%", boxSizing: "border-box", background: "#191510", border: "1px solid #2A2520", borderRadius: "10px", padding: "12px 14px", color: "#E8DFD0", fontSize: "14px", fontFamily: "inherit", marginBottom: "10px" };
-const errorStyle = { background: "rgba(229,115,115,0.08)", border: "1px solid rgba(229,115,115,0.25)", color: "#F1B1B1", borderRadius: "12px", padding: "12px 14px", marginBottom: "10px" };
-const panelStyle = { background: "#15120E", border: "1px solid #252018", borderRadius: "16px", padding: "24px", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" };
-const panelTitle = { fontSize: "24px", color: "#E8DFD0", marginBottom: "10px" };
-const panelText = { fontSize: "14px", color: "#6A6058", lineHeight: "1.7", marginBottom: "18px" };
-const featureGrid = { display: "grid", gap: "10px" };
-const featureItem = { background: "#191510", border: "1px solid #2A2520", borderRadius: "12px", padding: "14px", color: "#D4C9B8", fontSize: "14px" };
-const responsiveAuthCss = `
-  @media (max-width: 900px) {
-    .auth-layout {
-      grid-template-columns: 1fr !important;
-    }
-  }
-`;
