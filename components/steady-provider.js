@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   changePassword as changePasswordRequest,
+  deleteAccount as deleteAccountRequest,
   fetchAdminUsers,
   fetchMe,
   fetchProfile,
@@ -228,6 +229,13 @@ export function SteadyProvider({ children }) {
     return result.profile;
   }
 
+  async function deleteAccount() {
+    if (!authToken) throw new Error("Please sign in first.");
+    await deleteAccountRequest(authToken);
+    logout();
+    return true;
+  }
+
   function logout() {
     clearAuthSession();
     setAuthToken("");
@@ -346,6 +354,7 @@ export function SteadyProvider({ children }) {
       completePasswordReset,
       changePassword,
       logout,
+      deleteAccount,
       saveProfile,
       refreshProfile,
       choosePlan,

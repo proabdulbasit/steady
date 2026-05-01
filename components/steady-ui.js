@@ -251,6 +251,16 @@ export function AppChrome({ children }) {
         )}
       </header>
       {children}
+      <footer style={{ borderTop: "1px solid #1E1A15", padding: "18px 20px", color: "#6A6058" }}>
+        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ fontSize: "12px" }}>© {new Date().getFullYear()} Steady</div>
+          <div style={{ display: "flex", gap: "10px", fontSize: "12px" }}>
+            <Link href="/privacy" style={{ color: "#B4A799" }}>Privacy</Link>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <Link href="/terms" style={{ color: "#B4A799" }}>Terms</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -2,6 +2,7 @@ const express = require("express");
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { getUserById, serializeUser } = require("../lib/user-service");
 const User = require("../models/User");
+const Conversation = require("../models/Conversation");
 
 const router = express.Router();
 
@@ -42,6 +43,19 @@ router.patch("/me", requireAuth, async (req, res) => {
   await user.save();
 
   return res.json({ profile: serializeUser(user) });
+});
+
+router.delete("/me", requireAuth, async (req, res) => {
+  const userId = req.auth.sub;
+  const user = await getUserById(userId);
+  if (!user) {
+    return res.status(404).json({ error: "User not found." });
+  }
+
+  await Conversation.deleteMany({ userId });
+  await User.deleteOne({ _id: userId });
+
+  return res.json({ ok: true });
 });
 
 router.get("/admin/users", requireAdmin, async (_req, res) => {
