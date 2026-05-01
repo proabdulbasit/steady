@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSteady } from "./steady-provider";
+import { useTheme } from "./theme-provider";
+
+/* =========================================================
+   Public constants — kept for backward compatibility
+   ========================================================= */
 
 export const STARTER_QUESTIONS = [
   "My employee keeps calling out last minute. What do I do?",
@@ -23,9 +28,7 @@ Rules:
 - Never say "consider" or "it depends" — give a real answer.`;
 
 export const FREE_TIER_ADDITION = `Keep responses to 2 short paragraphs maximum. Give the direct answer and one Next Move only. No benchmarks, no checklists, no risk flags.`;
-
 export const PRO_TIER_ADDITION = `Give thorough answers with real specifics, benchmarks, and a clear Next Move. 3-4 paragraphs.`;
-
 export const BUSINESS_TIER_ADDITION = `Give full detailed responses including confidence score, industry benchmarks, before/after expectations, risk flags, implementation checklist, and Next Move.`;
 
 export const FREE_SYSTEM = `${CORE_STEADY_SYSTEM}\n\n${FREE_TIER_ADDITION}`;
@@ -79,204 +82,228 @@ ANNUAL IMPACT: $[yearly savings if they act on all opportunities]
 
 Next move: [The single most impactful saving to tackle first]`;
 
-export function GoldButton({ children, ...props }) {
+/* =========================================================
+   Buttons & primitives
+   ========================================================= */
+
+export function GoldButton({ children, className = "", ...props }) {
   return (
-    <button
-      {...props}
-      style={{
-        background: props.disabled ? "#2A2520" : "linear-gradient(135deg,#C8A96E,#A07840)",
-        border: "none",
-        borderRadius: "10px",
-        padding: "14px 24px",
-        color: props.disabled ? "#5A5248" : "#0F0D0A",
-        fontSize: "15px",
-        fontWeight: "700",
-        cursor: props.disabled ? "default" : "pointer",
-        fontFamily: "inherit",
-        ...(props.style || {}),
-      }}
-    >
+    <button {...props} className={`btn btn-primary ${className}`.trim()}>
       {children}
     </button>
   );
 }
 
-export function PageShell({ title, eyebrow, description, children, center = false }) {
+export function GhostButton({ children, className = "", ...props }) {
   return (
-    <div
-      style={{
-        maxWidth: "1120px",
-        margin: "0 auto",
-        padding: center ? "24px 20px" : "32px 20px 48px",
-        minHeight: center ? "calc(100vh - 120px)" : undefined,
-        display: center ? "flex" : undefined,
-        flexDirection: center ? "column" : undefined,
-        justifyContent: center ? "center" : undefined,
-      }}
-    >
-      {eyebrow && <div style={{ fontSize: "11px", letterSpacing: "3px", textTransform: "uppercase", color: "#C8A96E", marginBottom: "12px" }}>{eyebrow}</div>}
-      {title && <h1 style={{ fontSize: "clamp(30px,5vw,52px)", lineHeight: "1.1", margin: "0 0 10px 0", fontWeight: "400", color: "#E8DFD0" }}>{title}</h1>}
-      {description && <p style={{ fontSize: "15px", color: "#6A6058", lineHeight: "1.7", maxWidth: "700px", margin: "0 0 28px 0" }}>{description}</p>}
+    <button {...props} className={`btn btn-ghost ${className}`.trim()}>
       {children}
-    </div>
+    </button>
   );
 }
+
+export function Eyebrow({ children }) {
+  return <div className="eyebrow" style={{ marginBottom: 14 }}>{children}</div>;
+}
+
+/* =========================================================
+   Page shell — kept compatible with existing pages
+   ========================================================= */
+
+export function PageShell({ title, eyebrow, description, children, center = false }) {
+  return (
+    <main className="container" style={{
+      padding: center ? "48px 24px" : "56px 24px 96px",
+      minHeight: center ? "calc(100vh - 180px)" : undefined,
+      display: center ? "flex" : undefined,
+      flexDirection: center ? "column" : undefined,
+      justifyContent: center ? "center" : undefined,
+    }}>
+      {eyebrow && <div className="eyebrow" style={{ marginBottom: 14 }}>{eyebrow}</div>}
+      {title && <h1 className="h2 serif" style={{ margin: "0 0 14px" }}>{title}</h1>}
+      {description && <p className="lede" style={{ maxWidth: 720, margin: "0 0 32px" }}>{description}</p>}
+      {children}
+    </main>
+  );
+}
+
+/* =========================================================
+   Theme toggle
+   ========================================================= */
+
+function ThemeToggle() {
+  const { theme, toggleTheme, mounted } = useTheme();
+  const isDark = theme === "dark";
+  return (
+    <button
+      type="button"
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      onClick={toggleTheme}
+      className="icon-btn"
+      title={isDark ? "Light mode" : "Dark mode"}
+    >
+      <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>
+        {mounted ? (isDark ? "☀" : "☾") : "·"}
+      </span>
+    </button>
+  );
+}
+
+/* =========================================================
+   App chrome — header, footer, mobile menu
+   ========================================================= */
 
 export function AppChrome({ children }) {
   const pathname = usePathname();
   const { profile, isAuthenticated } = useSteady();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const navItems = [
     { href: "/", label: "Home" },
     { href: "/pricing", label: "Pricing" },
-    ...(isAuthenticated ? [{ href: "/profile", label: "Profile" }] : [{ href: "/login", label: "Login" }, { href: "/register", label: "Register" }]),
-    ...(profile.role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),
+    ...(isAuthenticated
+      ? [{ href: "/profile", label: "Profile" }]
+      : [{ href: "/login", label: "Login" }, { href: "/register", label: "Register" }]),
+    ...(profile?.role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0F0D0A", color: "#E8DFD0", fontFamily: "'Georgia','Times New Roman',serif" }}>
-      <style>{`
-        body{margin:0;background:#0F0D0A}
-        a{text-decoration:none}
-        input,textarea,select{outline:none}
-
-        .steady-desktop-nav{display:flex}
-        .steady-mobile-menu-button{display:none}
-        .steady-mobile-menu{display:none}
-
-        @media (max-width: 768px){
-          .steady-desktop-nav{display:none !important}
-          .steady-mobile-menu-button{display:inline-flex !important}
-          .steady-mobile-menu{display:block !important}
-        }
-      `}</style>
-      <header style={{ borderBottom: "1px solid #1E1A15", background: "rgba(15,13,10,0.98)", position: "sticky", top: 0, zIndex: 20 }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "20px" }}>
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#C8A96E,#8B6914)", display: "flex", alignItems: "center", justifyContent: "center", color: "#0F0D0A", fontWeight: "700", fontSize: "22px" }}>S</div>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <header className="app-header">
+        <div className="container" style={{ padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="brand-mark">S</div>
             <div>
-              <div style={{ color: "#E8DFD0", fontSize: "22px", fontWeight: "600" }}>Steady</div>
-              <div style={{ color: "#4A4540", fontSize: "11px", letterSpacing: "1.6px", textTransform: "uppercase" }}>Your Business Co-Pilot</div>
+              <div className="serif" style={{ fontSize: 22, fontWeight: 500, color: "var(--ink)", letterSpacing: "-0.01em" }}>Steady</div>
+              <div style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--ink-3)" }}>Your business co-pilot</div>
             </div>
           </Link>
-          <nav className="steady-desktop-nav" style={{ alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+
+          <nav className="desktop-only" style={{ alignItems: "center", gap: 4 }}>
             {navItems.map((item) => {
               const active = pathname === item.href;
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  style={{
-                    border: active ? "1px solid rgba(200,169,110,0.35)" : "1px solid #252018",
-                    background: active ? "rgba(200,169,110,0.1)" : "rgba(255,255,255,0.02)",
-                    color: active ? "#C8A96E" : "#D4C9B8",
-                    borderRadius: "999px",
-                    padding: "10px 14px",
-                    fontSize: "14px",
-                  }}
-                >
+                <Link key={item.href} href={item.href} className={`nav-link ${active ? "active" : ""}`}>
                   {item.label}
                 </Link>
               );
             })}
+            <div style={{ width: 1, height: 22, background: "var(--line)", margin: "0 8px" }} />
+            <ThemeToggle />
+            {!isAuthenticated && (
+              <Link href="/register" className="btn btn-primary btn-sm" style={{ marginLeft: 6 }}>
+                Get started
+              </Link>
+            )}
             {isAuthenticated && (
-              <div style={{ border: "1px solid #252018", background: "rgba(255,255,255,0.02)", color: "#C8A96E", borderRadius: "999px", padding: "10px 14px", fontSize: "14px" }}>
-                {profile.name || profile.email}
-              </div>
+              <Link href="/chat" className="btn btn-primary btn-sm" style={{ marginLeft: 6 }}>
+                Open chat
+              </Link>
             )}
           </nav>
 
-          <button
-            type="button"
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-            onClick={() => setMobileMenuOpen((v) => !v)}
-            className="steady-mobile-menu-button"
-            style={{
-              width: "44px",
-              height: "44px",
-              borderRadius: "999px",
-              border: "1px solid #252018",
-              background: mobileMenuOpen ? "rgba(200,169,110,0.12)" : "rgba(255,255,255,0.02)",
-              color: mobileMenuOpen ? "#C8A96E" : "#D4C9B8",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <span aria-hidden="true" style={{ fontSize: "18px", lineHeight: 1 }}>
-              {mobileMenuOpen ? "×" : "≡"}
-            </span>
-          </button>
+          <div className="mobile-only" style={{ alignItems: "center", gap: 8 }}>
+            <ThemeToggle />
+            <button
+              type="button"
+              aria-label={open ? "Close menu" : "Open menu"}
+              onClick={() => setOpen(v => !v)}
+              className="icon-btn"
+            >
+              <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>{open ? "×" : "≡"}</span>
+            </button>
+          </div>
         </div>
 
-        {mobileMenuOpen && (
-          <div className="steady-mobile-menu" style={{ borderTop: "1px solid #1E1A15", background: "rgba(15,13,10,0.98)" }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "12px 20px 16px" }}>
-              <div style={{ display: "grid", gap: "10px" }}>
-                {navItems.map((item) => {
-                  const active = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      style={{
-                        border: active ? "1px solid rgba(200,169,110,0.35)" : "1px solid #252018",
-                        background: active ? "rgba(200,169,110,0.1)" : "rgba(255,255,255,0.02)",
-                        color: active ? "#C8A96E" : "#D4C9B8",
-                        borderRadius: "14px",
-                        padding: "12px 14px",
-                        fontSize: "15px",
-                      }}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-                {isAuthenticated && (
-                  <div style={{ border: "1px solid #252018", background: "rgba(255,255,255,0.02)", color: "#C8A96E", borderRadius: "14px", padding: "12px 14px", fontSize: "14px" }}>
-                    {profile.name || profile.email}
-                  </div>
-                )}
-              </div>
+        {open && (
+          <div className="mobile-only" style={{ borderTop: "1px solid var(--line)", background: "var(--bg)" }}>
+            <div className="container" style={{ padding: "14px 24px", display: "grid", gap: 8 }}>
+              {navItems.map((item) => {
+                const active = pathname === item.href;
+                return (
+                  <Link key={item.href} href={item.href} className={`nav-link ${active ? "active" : ""}`} style={{ padding: "12px 14px", borderRadius: 12 }}>
+                    {item.label}
+                  </Link>
+                );
+              })}
+              {!isAuthenticated && (
+                <Link href="/register" className="btn btn-primary" style={{ marginTop: 6 }}>Get started</Link>
+              )}
+              {isAuthenticated && (
+                <Link href="/chat" className="btn btn-primary" style={{ marginTop: 6 }}>Open chat</Link>
+              )}
             </div>
           </div>
         )}
       </header>
-      {children}
-      <footer style={{ borderTop: "1px solid #1E1A15", padding: "18px 20px", color: "#6A6058" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-          <div style={{ fontSize: "12px" }}>© {new Date().getFullYear()} Steady</div>
-          <div style={{ display: "flex", gap: "10px", fontSize: "12px" }}>
-            <Link href="/privacy" style={{ color: "#B4A799" }}>Privacy</Link>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <Link href="/terms" style={{ color: "#B4A799" }}>Terms</Link>
+
+      <div style={{ flex: 1 }}>{children}</div>
+
+      <footer className="app-footer">
+        <div className="container" style={{ display: "grid", gap: 24, gridTemplateColumns: "2fr 1fr 1fr 1fr" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div className="brand-mark" style={{ width: 36, height: 36, fontSize: 18 }}>S</div>
+              <div className="serif" style={{ fontSize: 20, color: "var(--ink)" }}>Steady</div>
+            </div>
+            <p style={{ fontSize: 14, color: "var(--ink-3)", maxWidth: 360, margin: 0 }}>
+              Direct, plain-spoken answers for the people running real businesses. Built to be useful in two minutes.
+            </p>
           </div>
+          <FooterCol title="Product" links={[["/", "Home"], ["/pricing", "Pricing"], ["/chat", "Chat"]]} />
+          <FooterCol title="Account" links={[["/login", "Sign in"], ["/register", "Register"], ["/profile", "Profile"]]} />
+          <FooterCol title="Legal" links={[["/privacy", "Privacy"], ["/terms", "Terms"]]} />
+        </div>
+        <div className="container" style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--line)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10, fontSize: 12, color: "var(--ink-3)" }}>
+          <div>© {new Date().getFullYear()} Steady. Business advice, not legal counsel.</div>
+          <div>Made for restaurants, auto shops, pawnshops & every other real business.</div>
         </div>
       </footer>
     </div>
   );
 }
 
+function FooterCol({ title, links }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--ink-3)", marginBottom: 12, fontWeight: 600 }}>{title}</div>
+      <div style={{ display: "grid", gap: 8 }}>
+        {links.map(([href, label]) => (
+          <Link key={href} href={href} style={{ fontSize: 14, color: "var(--ink-2)" }}>{label}</Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   Markdown-ish formatter (kept compatible)
+   ========================================================= */
+
 export function formatMessage(text) {
   const lines = text.split("\n").filter((line) => line.trim());
   return lines.map((line, index) => {
     if (line.toLowerCase().startsWith("next move:")) {
-      return <div key={index} style={{ marginTop: "16px", padding: "14px 16px", background: "rgba(200,169,110,0.08)", borderLeft: "3px solid #C8A96E", borderRadius: "0 8px 8px 0" }}><span style={{ display: "block", fontSize: "10px", letterSpacing: "2px", textTransform: "uppercase", color: "#C8A96E", marginBottom: "5px" }}>Next Move</span><span style={{ fontSize: "15px", color: "#E8DFD0", lineHeight: "1.5" }}>{line.replace(/next move:/i, "").trim()}</span></div>;
+      return (
+        <div key={index} style={{ marginTop: 18, padding: "16px 18px", background: "var(--gold-soft)", borderLeft: "3px solid var(--gold)", borderRadius: "0 12px 12px 0" }}>
+          <span style={{ display: "block", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 700, marginBottom: 6 }}>Next move</span>
+          <span style={{ fontSize: 16, color: "var(--ink)", lineHeight: 1.55 }}>{line.replace(/next move:/i, "").trim()}</span>
+        </div>
+      );
     }
     if (line.match(/^[A-Z][A-Z\s]+:/) && line.length < 60) {
-      return <div key={index} style={{ marginTop: "18px", marginBottom: "6px", fontSize: "11px", letterSpacing: "2px", textTransform: "uppercase", color: "#C8A96E", fontWeight: "700" }}>{line}</div>;
+      return <div key={index} style={{ marginTop: 20, marginBottom: 6, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 700 }}>{line}</div>;
     }
     if (line.match(/^\d+\./)) {
-      return <div key={index} style={{ display: "flex", gap: "10px", margin: "8px 0", paddingLeft: "4px" }}><span style={{ color: "#C8A96E", fontWeight: "700", minWidth: "20px" }}>{line.match(/^\d+/)[0]}.</span><span style={{ color: "#D4C9B8", lineHeight: "1.65", fontSize: "15px" }}>{line.replace(/^\d+\./, "").trim()}</span></div>;
+      return (
+        <div key={index} style={{ display: "flex", gap: 10, margin: "8px 0", paddingLeft: 4 }}>
+          <span style={{ color: "var(--gold)", fontWeight: 700, minWidth: 22 }}>{line.match(/^\d+/)[0]}.</span>
+          <span style={{ color: "var(--ink-2)", lineHeight: 1.65, fontSize: 15 }}>{line.replace(/^\d+\./, "").trim()}</span>
+        </div>
+      );
     }
-    return <p key={index} style={{ margin: "0 0 12px 0", lineHeight: "1.75", fontSize: "15px", color: "#D4C9B8" }}>{line.replace(/^-/, "").trim()}</p>;
+    return <p key={index} style={{ margin: "0 0 12px 0", lineHeight: 1.75, fontSize: 15, color: "var(--ink-2)" }}>{line.replace(/^-/, "").trim()}</p>;
   });
 }
