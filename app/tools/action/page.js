@@ -33,11 +33,11 @@ export default function ActionPage() {
 
   return (
     <PageShell eyebrow="Tool" title="Action Plan Builder" description="A dedicated page for turning one business problem into a step-by-step plan.">
-      <textarea value={topic} onChange={(e) => setTopic(e.target.value)} rows={6} placeholder="Describe the goal or problem" style={{ width: "100%", maxWidth: "640px", background: "#191510", border: "1px solid #2A2520", borderRadius: "12px", padding: "14px", color: "#E8DFD0", fontFamily: "inherit", fontSize: "15px", resize: "vertical" }} />
+      <textarea value={topic} onChange={(e) => setTopic(e.target.value)} rows={6} placeholder="Describe the goal or problem" style={{ width: "100%", maxWidth: "640px", background: "var(--bg)", border: "1px solid var(--line)", borderRadius: "12px", padding: "14px", color: "var(--ink)", fontFamily: "inherit", fontSize: "15px", resize: "vertical" }} />
       <div style={{ marginTop: "12px" }}>
         <GoldButton onClick={handleRun} disabled={loading || !topic.trim()}>{loading ? "Building..." : "Build Plan"}</GoldButton>
       </div>
-      {result && <div style={{ marginTop: "18px", background: "#15120E", border: "1px solid #252018", borderRadius: "16px", padding: "20px" }}>{formatMessage(result)}</div>}
+      {result && <div style={{ marginTop: "18px", background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "16px", padding: "20px", color: "var(--ink-2)" }}>{formatMessage(result)}</div>}
     </PageShell>
   );
 }

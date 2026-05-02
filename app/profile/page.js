@@ -70,7 +70,7 @@ export default function ProfilePage() {
             </GoldButton>
             <button onClick={logout} style={secondaryButton}>Log Out</button>
           </div>
-          <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid #252018" }}>
+          <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid var(--line)" }}>
             <div style={{ ...headingStyle, fontSize: "18px", marginBottom: "10px" }}>Password</div>
             <input
               type="password"
@@ -140,7 +140,7 @@ export default function ProfilePage() {
             </GoldButton>
           </div>
 
-          <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid #252018" }}>
+          <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid var(--line)" }}>
             <div style={{ ...headingStyle, fontSize: "18px", marginBottom: "10px" }}>Danger zone</div>
             {deleteMsg ? (
               <div style={{ ...(deleteMsg.startsWith("Error") ? errorStyle : successStyle), marginBottom: "10px" }}>{deleteMsg}</div>
@@ -223,9 +223,9 @@ export default function ProfilePage() {
             </div>
           }
         >
-          <div style={{ color: "#D4C9B8", lineHeight: 1.6 }}>
+          <div style={{ color: "var(--ink-2)", lineHeight: 1.6 }}>
             This will permanently delete your account and all saved chats.
-            <div style={{ marginTop: "8px", color: "#6A6058", fontSize: "13px" }}>This cannot be undone.</div>
+            <div style={{ marginTop: "8px", color: "var(--ink-3)", fontSize: "13px" }}>This cannot be undone.</div>
           </div>
         </Modal>
       ) : null}
@@ -255,16 +255,16 @@ function Modal({ title, onClose, children, footer }) {
       <div
         style={{
           width: "min(560px, 94vw)",
-          background: "#0F0D0A",
-          border: "1px solid #2A2520",
+          background: "var(--bg-elev)",
+          border: "1px solid var(--line)",
           borderRadius: "18px",
-          boxShadow: "0 30px 110px rgba(0,0,0,0.65)",
+          boxShadow: "var(--shadow-lg)",
           overflow: "hidden",
         }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1A15", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-          <div style={{ fontSize: "18px", fontWeight: 700, color: "#E8DFD0" }}>{title}</div>
+        <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--ink)" }}>{title}</div>
           <button
             type="button"
             aria-label="Close"
@@ -273,9 +273,9 @@ function Modal({ title, onClose, children, footer }) {
               width: "36px",
               height: "36px",
               borderRadius: "12px",
-              border: "1px solid #2A2520",
-              background: "rgba(255,255,255,0.02)",
-              color: "#D4C9B8",
+              border: "1px solid var(--line)",
+              background: "transparent",
+              color: "var(--ink-2)",
               cursor: "pointer",
               fontSize: "18px",
               lineHeight: 1,
@@ -285,17 +285,17 @@ function Modal({ title, onClose, children, footer }) {
           </button>
         </div>
         <div style={{ padding: "16px" }}>{children}</div>
-        {footer ? <div style={{ padding: "14px 16px 16px", borderTop: "1px solid #1E1A15" }}>{footer}</div> : null}
+        {footer ? <div style={{ padding: "14px 16px 16px", borderTop: "1px solid var(--line)" }}>{footer}</div> : null}
       </div>
     </div>
   );
 }
 
-const cardStyle = { background: "#15120E", border: "1px solid #252018", borderRadius: "18px", padding: "24px" };
-const headingStyle = { fontSize: "22px", color: "#E8DFD0", marginBottom: "12px" };
-const inputStyle = { width: "100%", boxSizing: "border-box", background: "#191510", border: "1px solid #2A2520", borderRadius: "10px", padding: "12px 14px", color: "#E8DFD0", fontSize: "14px", fontFamily: "inherit", marginBottom: "10px" };
-const statLine = { fontSize: "14px", color: "#D4C9B8", marginBottom: "8px" };
-const secondaryButton = { background: "none", border: "1px solid #2A2520", color: "#8A7E70", borderRadius: "10px", padding: "14px 18px", cursor: "pointer", fontFamily: "inherit" };
+const cardStyle = { background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "18px", padding: "24px" };
+const headingStyle = { fontSize: "22px", color: "var(--ink)", marginBottom: "12px", fontFamily: "Fraunces, serif" };
+const inputStyle = { width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--line)", borderRadius: "10px", padding: "12px 14px", color: "var(--ink)", fontSize: "14px", fontFamily: "inherit", marginBottom: "10px" };
+const statLine = { fontSize: "14px", color: "var(--ink-2)", marginBottom: "8px" };
+const secondaryButton = { background: "none", border: "1px solid var(--line-strong)", color: "var(--ink-2)", borderRadius: "10px", padding: "14px 18px", cursor: "pointer", fontFamily: "inherit" };
 const errorStyle = {
   background: "rgba(229,115,115,0.08)",
   border: "1px solid rgba(229,115,115,0.25)",

@@ -139,22 +139,22 @@ export default function ChatSidebar() {
       style={{
         width: "280px",
         flexShrink: 0,
-        borderRight: "1px solid #1E1A15",
-        background: "rgba(12,10,8,0.98)",
+        borderRight: "1px solid var(--line)",
+        background: "var(--bg-elev)",
         position: "sticky",
         top: 0,
         height: "100vh",
         overflow: "visible",
       }}
     >
-      <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid #1E1A15" }}>
+      <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--line)" }}>
         <button
           onClick={createNewChat}
           style={{
             width: "100%",
-            border: "1px solid #2A2520",
-            background: "rgba(255,255,255,0.02)",
-            color: "#E8DFD0",
+            border: "1px solid var(--line-strong)",
+            background: "transparent",
+            color: "var(--ink)",
             borderRadius: "12px",
             padding: "12px 12px",
             cursor: "pointer",
@@ -167,19 +167,19 @@ export default function ChatSidebar() {
           }}
         >
           <span style={{ fontWeight: 600 }}>New chat</span>
-          <span aria-hidden="true" style={{ color: "#C8A96E", fontSize: "18px", lineHeight: 1 }}>
+          <span aria-hidden="true" style={{ color: "var(--gold)", fontSize: "18px", lineHeight: 1 }}>
             +
           </span>
         </button>
       </div>
 
       <div style={{ padding: "10px 10px 14px", height: "calc(100vh - 66px)", overflowY: "auto" }}>
-        <div style={{ fontSize: "10px", letterSpacing: "2px", textTransform: "uppercase", color: "#6A6058", padding: "6px 6px 10px" }}>
+        <div style={{ fontSize: "10px", letterSpacing: "2px", textTransform: "uppercase", color: "var(--ink-3)", padding: "6px 6px 10px" }}>
           Recent chats
         </div>
 
         {loading ? (
-          <div style={{ color: "#6A6058", fontSize: "13px", padding: "8px 6px" }}>Loading…</div>
+          <div style={{ color: "var(--ink-3)", fontSize: "13px", padding: "8px 6px" }}>Loading…</div>
         ) : items.length ? (
           <div style={{ display: "grid", gap: "6px" }}>
             {items.map((c) => {
@@ -190,9 +190,9 @@ export default function ChatSidebar() {
                   data-chat-menu-root
                   style={{
                     position: "relative",
-                    border: isActive ? "1px solid rgba(200,169,110,0.4)" : "1px solid #1F1A15",
-                    background: isActive ? "rgba(200,169,110,0.10)" : "rgba(255,255,255,0.01)",
-                    color: isActive ? "#C8A96E" : "#D4C9B8",
+                    border: isActive ? "1px solid var(--gold-ring)" : "1px solid var(--line)",
+                    background: isActive ? "var(--gold-soft)" : "transparent",
+                    color: isActive ? "var(--gold)" : "var(--ink-2)",
                     borderRadius: "12px",
                     overflow: "visible",
                   }}
@@ -216,11 +216,11 @@ export default function ChatSidebar() {
                     }}
                   >
                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                      {c.pinned ? <span title="Pinned" aria-hidden="true" style={{ color: "#C8A96E" }}>📌</span> : null}
+                      {c.pinned ? <span title="Pinned" aria-hidden="true" style={{ color: "var(--gold)" }}>📌</span> : null}
                       <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "New chat"}</div>
                     </div>
                     {c.lastMessagePreview ? (
-                      <div style={{ color: isActive ? "rgba(200,169,110,0.8)" : "#6A6058", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ color: isActive ? "var(--gold)" : "var(--ink-3)", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {c.lastMessagePreview}
                       </div>
                     ) : null}
@@ -255,9 +255,9 @@ export default function ChatSidebar() {
                       width: "28px",
                       height: "28px",
                       borderRadius: "10px",
-                      border: "1px solid #2A2520",
-                      background: isActive ? "rgba(200,169,110,0.12)" : "rgba(255,255,255,0.02)",
-                      color: isActive ? "#C8A96E" : "#D4C9B8",
+                      border: "1px solid var(--line)",
+                      background: isActive ? "var(--gold-soft)" : "var(--bg-elev)",
+                      color: isActive ? "var(--gold)" : "var(--ink-2)",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -274,7 +274,7 @@ export default function ChatSidebar() {
             })}
           </div>
         ) : (
-          <div style={{ color: "#6A6058", fontSize: "13px", padding: "8px 6px", lineHeight: 1.5 }}>
+          <div style={{ color: "var(--ink-3)", fontSize: "13px", padding: "8px 6px", lineHeight: 1.5 }}>
             No chats yet.
             <br />
             Start a new one.
@@ -293,9 +293,9 @@ export default function ChatSidebar() {
             left: menuAnchor.right + 12,
             width: "220px",
             borderRadius: "14px",
-            border: "1px solid #2A2520",
-            background: "#0F0D0A",
-            boxShadow: "0 18px 60px rgba(0,0,0,0.55)",
+            border: "1px solid var(--line)",
+            background: "var(--bg-elev)",
+            boxShadow: "var(--shadow-lg)",
             padding: "8px",
             zIndex: 9999,
           }}
@@ -310,7 +310,7 @@ export default function ChatSidebar() {
             label={menuChat.pinned ? "Unpin chat" : "Pin chat"}
             onClick={() => onTogglePin(menuChat.id, Boolean(menuChat.pinned))}
           />
-          <div style={{ height: "1px", background: "#1E1A15", margin: "8px 0" }} />
+          <div style={{ height: "1px", background: "var(--line)", margin: "8px 0" }} />
           <MenuItem label="Delete" danger onClick={() => openDeleteModal(menuChat)} />
         </div>
       ) : null}
@@ -318,18 +318,18 @@ export default function ChatSidebar() {
       {shareChat ? (
         <Modal title={shareChat.title} onClose={() => setShareChat(null)} footer={null}>
           <div style={{ display: "grid", gap: "12px" }}>
-            <div style={{ fontSize: "13px", color: "#6A6058" }}>Share this chat</div>
+            <div style={{ fontSize: "13px", color: "var(--ink-3)" }}>Share this chat</div>
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               <input
                 readOnly
                 value={`${typeof window !== "undefined" ? window.location.origin : ""}/chat?c=${encodeURIComponent(shareChat.id)}`}
                 style={{
                   flex: 1,
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid #2A2520",
+                  background: "var(--bg)",
+                  border: "1px solid var(--line)",
                   borderRadius: "12px",
                   padding: "12px 12px",
-                  color: "#E8DFD0",
+                  color: "var(--ink)",
                   fontFamily: "inherit",
                   fontSize: "13px",
                 }}
@@ -381,7 +381,7 @@ export default function ChatSidebar() {
           }
         >
           <div style={{ display: "grid", gap: "10px" }}>
-            <div style={{ fontSize: "13px", color: "#6A6058" }}>Chat name</div>
+            <div style={{ fontSize: "13px", color: "var(--ink-3)" }}>Chat name</div>
             <input
               autoFocus
               value={renameChat.nextTitle}
@@ -391,11 +391,11 @@ export default function ChatSidebar() {
               }}
               style={{
                 width: "100%",
-                background: "rgba(255,255,255,0.02)",
-                border: "1px solid #2A2520",
+                background: "var(--bg)",
+                border: "1px solid var(--line)",
                 borderRadius: "12px",
                 padding: "12px 12px",
-                color: "#E8DFD0",
+                color: "var(--ink)",
                 fontFamily: "inherit",
                 fontSize: "14px",
               }}
@@ -419,7 +419,7 @@ export default function ChatSidebar() {
                 style={{
                   ...primaryButtonStyle,
                   background: "linear-gradient(135deg,#E45A5A,#B83C3C)",
-                  color: "#0F0D0A",
+                  color: "#fff",
                 }}
               >
                 Delete
@@ -427,9 +427,9 @@ export default function ChatSidebar() {
             </div>
           }
         >
-          <div style={{ color: "#D4C9B8", lineHeight: 1.6 }}>
-            This will delete <span style={{ fontWeight: 700, color: "#E8DFD0" }}>{deleteChat.title}</span>.
-            <div style={{ marginTop: "8px", color: "#6A6058", fontSize: "13px" }}>This cannot be undone.</div>
+          <div style={{ color: "var(--ink-2)", lineHeight: 1.6 }}>
+            This will delete <span style={{ fontWeight: 700, color: "var(--ink)" }}>{deleteChat.title}</span>.
+            <div style={{ marginTop: "8px", color: "var(--ink-3)", fontSize: "13px" }}>This cannot be undone.</div>
           </div>
         </Modal>
       ) : null}
@@ -441,13 +441,13 @@ export default function ChatSidebar() {
             left: "16px",
             bottom: "16px",
             width: "248px",
-            background: "rgba(20,16,12,0.95)",
-            border: "1px solid #2A2520",
-            color: "#E8DFD0",
+            background: "var(--bg-elev)",
+            border: "1px solid var(--line)",
+            color: "var(--ink)",
             borderRadius: "14px",
             padding: "10px 12px",
             fontSize: "13px",
-            boxShadow: "0 18px 60px rgba(0,0,0,0.55)",
+            boxShadow: "var(--shadow-lg)",
             zIndex: 80,
           }}
         >
@@ -480,7 +480,7 @@ function MenuItem({ label, onClick, danger = false }) {
         textAlign: "left",
         border: "1px solid transparent",
         background: "transparent",
-        color: danger ? "#E45A5A" : "#E8DFD0",
+        color: danger ? "#E45A5A" : "var(--ink)",
         borderRadius: "10px",
         padding: "10px 10px",
         cursor: "pointer",
@@ -488,8 +488,8 @@ function MenuItem({ label, onClick, danger = false }) {
         fontSize: "14px",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.background = danger ? "rgba(228,90,90,0.08)" : "rgba(255,255,255,0.04)";
-        e.currentTarget.style.borderColor = danger ? "rgba(228,90,90,0.22)" : "#2A2520";
+        e.currentTarget.style.background = danger ? "rgba(228,90,90,0.08)" : "var(--bg-soft)";
+        e.currentTarget.style.borderColor = danger ? "rgba(228,90,90,0.22)" : "var(--line)";
       }}
       onMouseOut={(e) => {
         e.currentTarget.style.background = "transparent";
@@ -523,10 +523,10 @@ function Modal({ title, onClose, children, footer }) {
       <div
         style={{
           width: "min(560px, 94vw)",
-          background: "#0F0D0A",
-          border: "1px solid #2A2520",
+          background: "var(--bg-elev)",
+          border: "1px solid var(--line)",
           borderRadius: "18px",
-          boxShadow: "0 30px 110px rgba(0,0,0,0.65)",
+          boxShadow: "var(--shadow-lg)",
           overflow: "hidden",
         }}
         onMouseDown={(e) => e.stopPropagation()}
@@ -534,14 +534,14 @@ function Modal({ title, onClose, children, footer }) {
         <div
           style={{
             padding: "16px 16px 12px",
-            borderBottom: "1px solid #1E1A15",
+            borderBottom: "1px solid var(--line)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             gap: "10px",
           }}
         >
-          <div style={{ fontSize: "18px", fontWeight: 700, color: "#E8DFD0" }}>{title}</div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--ink)" }}>{title}</div>
           <button
             type="button"
             aria-label="Close"
@@ -550,9 +550,9 @@ function Modal({ title, onClose, children, footer }) {
               width: "36px",
               height: "36px",
               borderRadius: "12px",
-              border: "1px solid #2A2520",
-              background: "rgba(255,255,255,0.02)",
-              color: "#D4C9B8",
+              border: "1px solid var(--line)",
+              background: "transparent",
+              color: "var(--ink-2)",
               cursor: "pointer",
               fontSize: "18px",
               lineHeight: 1,
@@ -562,7 +562,7 @@ function Modal({ title, onClose, children, footer }) {
           </button>
         </div>
         <div style={{ padding: "16px" }}>{children}</div>
-        {footer ? <div style={{ padding: "14px 16px 16px", borderTop: "1px solid #1E1A15" }}>{footer}</div> : null}
+        {footer ? <div style={{ padding: "14px 16px 16px", borderTop: "1px solid var(--line)" }}>{footer}</div> : null}
       </div>
     </div>
   );
@@ -577,9 +577,9 @@ function ShareCircle({ label, onClick }) {
         width: "64px",
         height: "64px",
         borderRadius: "999px",
-        border: "1px solid #2A2520",
-        background: "rgba(255,255,255,0.02)",
-        color: "#E8DFD0",
+        border: "1px solid var(--line)",
+        background: "transparent",
+        color: "var(--ink)",
         cursor: "pointer",
         fontFamily: "inherit",
         fontWeight: 700,
@@ -592,9 +592,9 @@ function ShareCircle({ label, onClick }) {
 }
 
 const secondaryButtonStyle = {
-  border: "1px solid #2A2520",
-  background: "rgba(255,255,255,0.02)",
-  color: "#E8DFD0",
+  border: "1px solid var(--line-strong)",
+  background: "transparent",
+  color: "var(--ink)",
   borderRadius: "12px",
   padding: "12px 14px",
   cursor: "pointer",
@@ -604,8 +604,8 @@ const secondaryButtonStyle = {
 
 const primaryButtonStyle = {
   border: "none",
-  background: "linear-gradient(135deg,#C8A96E,#A07840)",
-  color: "#0F0D0A",
+  background: "var(--gradient-gold)",
+  color: "#1A1410",
   borderRadius: "12px",
   padding: "12px 14px",
   cursor: "pointer",
