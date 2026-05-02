@@ -9,11 +9,11 @@ function ChatShellFallback() {
         style={{
           width: "280px",
           flexShrink: 0,
-          borderRight: "1px solid #1E1A15",
-          background: "rgba(12,10,8,0.98)",
+          borderRight: "1px solid var(--line)",
+          background: "var(--bg-elev)",
         }}
       />
-      <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#6A6058", fontSize: "14px" }}>
+      <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: "14px" }}>
         Loading…
       </main>
     </div>
