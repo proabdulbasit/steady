@@ -252,16 +252,16 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
       }
     >
       {conversationTitle ? (
-        <div style={{ marginBottom: "12px", fontSize: "12px", color: "#6A6058" }}>
-          <span style={{ color: "#C8A96E", letterSpacing: "2px", textTransform: "uppercase", fontSize: "10px", marginRight: "8px" }}>Chat</span>
+        <div style={{ marginBottom: "12px", fontSize: "12px", color: "var(--ink-3)" }}>
+          <span style={{ color: "var(--gold)", letterSpacing: "2px", textTransform: "uppercase", fontSize: "10px", marginRight: "8px" }}>Chat</span>
           <span>{conversationTitle}</span>
         </div>
       ) : null}
-      <div style={{ background: "#15120E", border: "1px solid #252018", borderRadius: "18px", padding: "16px", minHeight: "320px" }}>
+      <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "18px", padding: "16px", minHeight: "320px" }}>
         <div style={{ display: "grid", gap: "16px" }}>
           {messages.map((msg, i) => (
             <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-              <div style={{ maxWidth: "85%", background: msg.role === "user" ? "linear-gradient(135deg,#C8A96E,#A07840)" : "#191510", border: msg.role === "assistant" ? "1px solid #2A2218" : "none", borderRadius: "16px", padding: msg.role === "user" ? "12px 16px" : "18px 20px", color: msg.role === "user" ? "#0F0D0A" : "#D4C9B8" }}>
+              <div style={{ maxWidth: "85%", background: msg.role === "user" ? "var(--gradient-gold)" : "var(--bg-soft)", border: msg.role === "assistant" ? "1px solid var(--line)" : "none", borderRadius: "16px", padding: msg.role === "user" ? "12px 16px" : "18px 20px", color: msg.role === "user" ? "#1A1410" : "var(--ink-2)" }}>
                 {msg.role === "user" ? (
                   <div style={{ display: "grid", gap: "10px" }}>
                     {Array.isArray(msg.attachments) && msg.attachments.length ? (
@@ -302,7 +302,7 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
               </div>
             </div>
           ))}
-          {loading && <div style={{ color: "#6A6058" }}>Steady is thinking...</div>}
+          {loading && <div style={{ color: "var(--ink-3)" }}>Steady is thinking...</div>}
           <div ref={bottomRef} />
         </div>
       </div>
@@ -361,8 +361,8 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
-                background: "#17130F",
-                border: "1px solid #2A2520",
+                background: "var(--bg-soft)",
+                border: "1px solid var(--line)",
                 borderRadius: "16px",
                 padding: "8px 8px",
               }}
@@ -371,10 +371,10 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
                 <img
                   src={a.previewUrl}
                   alt=""
-                  style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid #2A2520" }}
+                  style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid var(--line)" }}
                 />
               ) : (
-                <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid #2A2520", display: "flex", alignItems: "center", justifyContent: "center", color: "#C8A96E", fontWeight: 900 }}>
+                <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900 }}>
                   FILE
                 </div>
               )}
@@ -389,9 +389,9 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
                   width: "30px",
                   height: "30px",
                   borderRadius: "10px",
-                  border: "1px solid #2A2520",
-                  background: "rgba(255,255,255,0.02)",
-                  color: "#D4C9B8",
+                  border: "1px solid var(--line)",
+                  background: "transparent",
+                  color: "var(--ink-2)",
                   cursor: "pointer",
                   flexShrink: 0,
                 }}
@@ -403,7 +403,7 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         </div>
       ) : null}
 
-      <div className="chat-composer" style={{ display: "flex", gap: "10px", marginTop: "16px", alignItems: "center", background: "#17130F", border: "1px solid #2A2520", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
+      <div className="chat-composer" style={{ display: "flex", gap: "10px", marginTop: "16px", alignItems: "center", background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
         <button
           type="button"
           aria-label="Add attachment"
@@ -412,7 +412,7 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         >
           +
         </button>
-        <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="What's going on with your business?" style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "#E8DFD0", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }} />
+        <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="What's going on with your business?" style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }} />
         {/*
           Keep the send button on-brand even when disabled. We dim it instead of swapping colors
           so the composer always looks consistent with the rest of the theme.
@@ -425,8 +425,8 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
             height: "48px",
             borderRadius: "999px",
             border: "none",
-            background: "linear-gradient(135deg,#C8A96E,#A07840)",
-            color: "#0F0D0A",
+            background: "var(--gradient-gold)",
+            color: "#1A1410",
             opacity: (input.trim() || attachments.length) && !loading ? 1 : 0.35,
             cursor: (input.trim() || attachments.length) && !loading ? "pointer" : "not-allowed",
             fontSize: "24px",
@@ -456,7 +456,7 @@ const iconButtonStyle = {
   borderRadius: "999px",
   border: "none",
   background: "transparent",
-  color: "#B7AA97",
+  color: "var(--ink-3)",
   cursor: "default",
   fontSize: "28px",
   display: "flex",
