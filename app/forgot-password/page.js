@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
         <div style={authCard}>
           {done ? (
             <>
-              <p style={{ fontSize: "15px", color: "#D4C9B8", lineHeight: "1.6", margin: "0 0 16px" }}>
+              <p style={{ fontSize: "15px", color: "var(--ink-2)", lineHeight: "1.6", margin: "0 0 16px" }}>
                 If an account exists for that email address, check your inbox for a reset link. It may take a minute to arrive.
               </p>
               <GoldButton onClick={() => router.push("/login")} style={{ width: "100%", minHeight: "48px" }}>
@@ -66,8 +66,8 @@ export default function ForgotPasswordPage() {
               <GoldButton onClick={handleSubmit} disabled={loading} style={{ width: "100%", minHeight: "48px" }}>
                 {loading ? "Sending..." : "Send reset link"}
               </GoldButton>
-              <div style={{ marginTop: "14px", color: "#6A6058", fontSize: "14px", textAlign: "center" }}>
-                <Link href="/login" style={{ color: "#C8A96E" }}>
+              <div style={{ marginTop: "14px", color: "var(--ink-3)", fontSize: "14px", textAlign: "center" }}>
+                <Link href="/login" style={{ color: "var(--gold)" }}>
                   Back to sign in
                 </Link>
               </div>
@@ -81,8 +81,8 @@ export default function ForgotPasswordPage() {
 
 const authCard = {
   padding: "24px",
-  background: "#15120E",
-  border: "1px solid #252018",
+  background: "var(--bg-elev)",
+  border: "1px solid var(--line)",
   borderRadius: "16px",
   display: "flex",
   flexDirection: "column",
@@ -91,11 +91,11 @@ const authCard = {
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box",
-  background: "#191510",
-  border: "1px solid #2A2520",
+  background: "var(--bg)",
+  border: "1px solid var(--line)",
   borderRadius: "10px",
   padding: "12px 14px",
-  color: "#E8DFD0",
+  color: "var(--ink)",
   fontSize: "14px",
   fontFamily: "inherit",
   marginBottom: "10px",

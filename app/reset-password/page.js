@@ -85,12 +85,12 @@ function ResetPasswordForm() {
         >
           {loading ? "Saving..." : "Set new password"}
         </GoldButton>
-        <div style={{ marginTop: "14px", color: "#6A6058", fontSize: "14px", textAlign: "center" }}>
-          <Link href="/forgot-password" style={{ color: "#C8A96E" }}>
+        <div style={{ marginTop: "14px", color: "var(--ink-3)", fontSize: "14px", textAlign: "center" }}>
+          <Link href="/forgot-password" style={{ color: "var(--gold)" }}>
             Request another link
           </Link>
           {" · "}
-          <Link href="/login" style={{ color: "#C8A96E" }}>
+          <Link href="/login" style={{ color: "var(--gold)" }}>
             Sign in
           </Link>
         </div>
@@ -110,7 +110,7 @@ export default function ResetPasswordPage() {
       <div style={{ width: "100%", maxWidth: "440px", margin: "0 auto" }}>
         <Suspense
           fallback={
-            <div style={{ ...authCard, color: "#6A6058", fontSize: "14px" }}>Loading reset form...</div>
+            <div style={{ ...authCard, color: "var(--ink-3)", fontSize: "14px" }}>Loading reset form...</div>
           }
         >
           <ResetPasswordForm />
@@ -122,8 +122,8 @@ export default function ResetPasswordPage() {
 
 const authCard = {
   padding: "24px",
-  background: "#15120E",
-  border: "1px solid #252018",
+  background: "var(--bg-elev)",
+  border: "1px solid var(--line)",
   borderRadius: "16px",
   display: "flex",
   flexDirection: "column",
@@ -132,11 +132,11 @@ const authCard = {
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box",
-  background: "#191510",
-  border: "1px solid #2A2520",
+  background: "var(--bg)",
+  border: "1px solid var(--line)",
   borderRadius: "10px",
   padding: "12px 14px",
-  color: "#E8DFD0",
+  color: "var(--ink)",
   fontSize: "14px",
   fontFamily: "inherit",
   marginBottom: "10px",

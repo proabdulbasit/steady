@@ -38,5 +38,5 @@ export default function SavingsPage() {
   );
 }
 
-const inputStyle = { width: "100%", boxSizing: "border-box", background: "#191510", border: "1px solid #2A2520", borderRadius: "10px", padding: "12px 14px", color: "#E8DFD0", fontSize: "14px", fontFamily: "inherit", marginBottom: "10px", maxWidth: "560px", display: "block" };
-const resultBox = { marginTop: "18px", background: "#15120E", border: "1px solid #252018", borderRadius: "16px", padding: "20px" };
+const inputStyle = { width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--line)", borderRadius: "10px", padding: "12px 14px", color: "var(--ink)", fontSize: "14px", fontFamily: "inherit", marginBottom: "10px", maxWidth: "560px", display: "block" };
+const resultBox = { marginTop: "18px", background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "16px", padding: "20px", color: "var(--ink-2)" };
