@@ -11,7 +11,10 @@
   --bg: #F6F1E7;          /* warm cream */
   --bg-elev: #FFFFFF;     /* card */
   --bg-soft: #EFE7D6;     /* subtle band */
-  --bg-deep: #1B1612;     /* footer / dark band on light page */
+  --bg-deep: #2A201A;     /* dark accent band (kept dark intentionally on dark band components) */
+  --bg-feature: #EFE7D6;  /* light feature band — used on auth-side / cta-band in light mode */
+  --on-feature: #1A1410;  /* text on feature band */
+  --on-feature-2: #6B5F54;
 
   --ink: #1A1410;         /* near-black, warm */
   --ink-2: #3A302A;       /* body */
@@ -50,6 +53,9 @@
   --bg-elev: #16110C;
   --bg-soft: #1B1611;
   --bg-deep: #050402;
+  --bg-feature: #16110C;
+  --on-feature: #F1E7D7;
+  --on-feature-2: rgba(241,231,215,0.78);
 
   --ink: #F1E7D7;
   --ink-2: #D4C9B8;
@@ -251,12 +257,16 @@ input, textarea, select { font-family: inherit; outline: none; }
 
 /* ---------- CTA band ---------- */
 .cta-band {
-  background: var(--bg-deep);
-  color: #F1E7D7;
+  background: var(--bg-feature);
+  color: var(--on-feature);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: 56px 48px;
   position: relative; overflow: hidden;
 }
+.cta-band .eyebrow { color: var(--gold) !important; }
+.cta-band h1, .cta-band h2, .cta-band h3 { color: var(--on-feature) !important; }
+.cta-band p { color: var(--on-feature-2) !important; }
 .cta-band::before {
   content: ""; position: absolute; inset: 0;
   background: radial-gradient(800px 300px at 80% 0%, rgba(213,177,106,0.18), transparent 60%);
@@ -283,8 +293,12 @@ input, textarea, select { font-family: inherit; outline: none; }
 
 /* ---------- Auth split ---------- */
 .auth-split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: stretch; min-height: 540px; }
-.auth-side { background: var(--bg-deep); color: #F1E7D7; border-radius: var(--radius-lg); padding: 40px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
-.auth-side::before { content: ""; position: absolute; inset: 0; background: radial-gradient(600px 280px at 90% 10%, rgba(213,177,106,0.18), transparent 60%); }
+.auth-side { background: var(--bg-feature); color: var(--on-feature); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 40px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+.auth-side::before { content: ""; position: absolute; inset: 0; background: radial-gradient(600px 280px at 90% 10%, var(--gold-soft), transparent 60%); pointer-events: none; }
+.auth-side .eyebrow { color: var(--gold) !important; }
+.auth-side h1, .auth-side h2, .auth-side h3 { color: var(--on-feature) !important; }
+.auth-side p, .auth-side .auth-feature { color: var(--on-feature-2) !important; }
+.auth-side > * { position: relative; z-index: 1; }
 
 /* ---------- Animations ---------- */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
