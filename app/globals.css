@@ -11,7 +11,10 @@
   --bg: #F6F1E7;          /* warm cream */
   --bg-elev: #FFFFFF;     /* card */
   --bg-soft: #EFE7D6;     /* subtle band */
-  --bg-deep: #1B1612;     /* footer / dark band on light page */
+  --bg-deep: #2A201A;     /* dark accent band (kept dark intentionally on dark band components) */
+  --bg-feature: #EFE7D6;  /* light feature band — used on auth-side / cta-band in light mode */
+  --on-feature: #1A1410;  /* text on feature band */
+  --on-feature-2: #6B5F54;
 
   --ink: #1A1410;         /* near-black, warm */
   --ink-2: #3A302A;       /* body */
