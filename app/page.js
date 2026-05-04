@@ -78,7 +78,7 @@ function Hero() {
           <div className="fade-up delay-2">
             <div className="hero-image-wrap">
               <Image
-                src="/hero-desk.jpg"
+                src="/hero-owner-v2.jpg"
                 alt="A restaurant owner at the counter of his cafe using Steady on a laptop to get a clear next move for his business."
                 width={1536}
                 height={1280}
@@ -240,7 +240,7 @@ function UseCases() {
         <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 36, alignItems: "center", marginBottom: 36 }} className="usecase-hero-grid">
           <div style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid var(--line)", boxShadow: "var(--shadow-md)" }}>
             <Image
-              src="/use-cases.jpg"
+              src="/use-cases-v2.jpg"
               alt="Three real owners using Steady on the job: a restaurant owner at his host stand on a tablet, a mechanic in the service bay on a phone, and a pawnshop owner reviewing the chat on a tablet behind the jewelry case."
               width={1536}
               height={1024}
