@@ -321,7 +321,7 @@ function FinalCTA() {
             </div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
               <Link href="/chat" className="btn btn-primary">Ask Steady →</Link>
-              <Link href="/pricing" className="btn" style={{ background: "transparent", color: "#F1E7D7", borderColor: "rgba(241,231,215,0.25)" }}>See pricing</Link>
+              <Link href="/pricing" className="btn btn-ghost">See pricing</Link>
             </div>
           </div>
         </div>
