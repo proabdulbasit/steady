@@ -53,6 +53,9 @@
   --bg-elev: #16110C;
   --bg-soft: #1B1611;
   --bg-deep: #050402;
+  --bg-feature: #16110C;
+  --on-feature: #F1E7D7;
+  --on-feature-2: rgba(241,231,215,0.78);
 
   --ink: #F1E7D7;
   --ink-2: #D4C9B8;
