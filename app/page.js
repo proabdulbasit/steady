@@ -79,7 +79,7 @@ function Hero() {
             <div className="hero-image-wrap">
               <Image
                 src="/hero-desk.jpg"
-                alt="A restaurant owner in an apron at the counter of his shop, consulting Steady on a tablet for a clear next move."
+                alt="A restaurant owner at the counter of his cafe using Steady on a laptop to get a clear next move for his business."
                 width={1536}
                 height={1280}
                 priority
@@ -241,7 +241,7 @@ function UseCases() {
           <div style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid var(--line)", boxShadow: "var(--shadow-md)" }}>
             <Image
               src="/use-cases.jpg"
-              alt="Three real owners at work: a chef reviewing receipts, a mechanic talking with a customer in the bay, and a pawnshop owner inspecting jewelry with a loupe."
+              alt="Three real owners using Steady on the job: a restaurant owner at his host stand on a tablet, a mechanic in the service bay on a phone, and a pawnshop owner reviewing the chat on a tablet behind the jewelry case."
               width={1536}
               height={1024}
               loading="lazy"
