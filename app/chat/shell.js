@@ -14,6 +14,7 @@ export default function ChatShell({ children }) {
   const { authToken, isAuthenticated } = useSteady();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated || !authToken) {
@@ -43,6 +44,11 @@ export default function ChatShell({ children }) {
     if (!first?.id) return;
     router.replace(`/chat?c=${encodeURIComponent(first.id)}`);
   }, [activeId, conversations, router]);
+
+  useEffect(() => {
+    // Close the mobile drawer when navigation changes.
+    setMobileSidebarOpen(false);
+  }, [activeId]);
 
   const createNewChat = useCallback(async () => {
     // UX like ChatGPT: "New chat" opens an empty conversation.
@@ -79,10 +85,25 @@ export default function ChatShell({ children }) {
 
   return (
     <ChatHistoryProvider value={value}>
-      <div style={{ display: "flex", minHeight: "100vh" }}>
-        <ChatSidebar />
-        <main style={{ flex: 1 }}>
-          {children}
+      <div className="chat-shell" style={{ display: "flex" }}>
+        <ChatSidebar
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
+        />
+        <main className="surface-chrome chat-main" style={{ flex: 1 }}>
+          <div className="chat-main-inner">
+            <div className="chat-toolbar">
+              <button
+                type="button"
+                aria-label="Open chat history"
+                className="icon-btn chat-mobile-toggle"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>≡</span>
+              </button>
+            </div>
+            {children}
+          </div>
         </main>
       </div>
     </ChatHistoryProvider>

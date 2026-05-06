@@ -62,17 +62,6 @@ function Hero() {
                   ? `${remainingQuestions} questions remaining today`
                   : `${remainingQuestions} free questions remaining today · No credit card`}
             </div>
-
-            {/* Composer */}
-            <div style={{ marginTop: 32 }}>
-              <div className="steady-composer">
-                <button type="button" aria-label="Add" className="icon-btn" style={{ width: 36, height: 36, border: "none", background: "transparent" }}>+</button>
-                <button onClick={() => router.push("/chat")} className="composer-input">
-                  What&apos;s going on with your business?
-                </button>
-                <button onClick={() => router.push("/chat")} className="composer-send" aria-label="Open chat">↑</button>
-              </div>
-            </div>
           </div>
 
           <div className="fade-up delay-2">
@@ -311,11 +300,11 @@ function FinalCTA() {
         <div className="cta-band">
           <div style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 32, alignItems: "center" }} className="cta-grid">
             <div>
-              <div className="eyebrow" style={{ color: "var(--gold-2)" }}>Stop guessing</div>
-              <h2 className="h2 serif" style={{ color: "#F1E7D7", margin: "10px 0 12px" }}>
+              <div className="eyebrow">Stop guessing</div>
+              <h2 className="h2 serif" style={{ margin: "10px 0 12px" }}>
                 The next move is one question away.
               </h2>
-              <p style={{ color: "rgba(241,231,215,0.75)", margin: 0, fontSize: 16, lineHeight: 1.6, maxWidth: 520 }}>
+              <p style={{ margin: 0, fontSize: 16, lineHeight: 1.6, maxWidth: 520 }}>
                 Try Steady free — three real questions per day, no credit card, no setup. Upgrade only if it earns its keep.
               </p>
             </div>

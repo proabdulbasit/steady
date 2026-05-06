@@ -3,7 +3,7 @@ import { PageShell } from "../../components/steady-ui";
 export default function TermsPage() {
   return (
     <PageShell eyebrow="Legal" title="Terms of Service" description="The rules for using Steady.">
-      <article className="card" style={{ padding: 36, lineHeight: 1.75 }}>
+      <article className="card legal-article" style={{ padding: 36, lineHeight: 1.75 }}>
         <Section title="Use of service">
           <p>By using Steady, you agree to use the service responsibly and not attempt to misuse, disrupt, or access other users&apos; data.</p>
         </Section>

@@ -3,7 +3,7 @@ import { PageShell } from "../../components/steady-ui";
 export default function PrivacyPage() {
   return (
     <PageShell eyebrow="Legal" title="Privacy Policy" description="How we collect, use, and protect your data.">
-      <article className="card" style={{ padding: 36, lineHeight: 1.75 }}>
+      <article className="card legal-article" style={{ padding: 36, lineHeight: 1.75 }}>
         <Section title="What we collect">
           <p>
             We collect the minimum information needed to provide the Steady service: your account details

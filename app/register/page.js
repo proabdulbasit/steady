@@ -39,16 +39,16 @@ export default function RegisterPage() {
         <aside className="auth-side">
           <div>
             <div className="eyebrow" style={{ color: "var(--gold-2)", marginBottom: 14 }}>Create your account</div>
-            <h1 className="h2 serif" style={{ color: "#F1E7D7", margin: "0 0 14px" }}>
+            <h1 className="h2 serif" style={{ color: "var(--on-feature)", margin: "0 0 14px" }}>
               Steady — built around your business, not a browser session.
             </h1>
-            <p style={{ color: "rgba(241,231,215,0.78)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
+            <p style={{ color: "var(--on-feature-2)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
               An account keeps your subscription, daily usage and saved chats attached to you across every device.
             </p>
           </div>
           <div style={{ display: "grid", gap: 10, marginTop: 28 }}>
             {["Personal profile and plan", "Saved usage stats", "Stripe-linked billing", "Industry-aware answers from day one"].map((i) => (
-              <div key={i} style={{ fontSize: 13, color: "rgba(241,231,215,0.85)", display: "flex", gap: 10, alignItems: "center" }}>
+              <div key={i} style={{ fontSize: 13, color: "var(--on-feature-2)", display: "flex", gap: 10, alignItems: "center" }}>
                 <span style={{ color: "var(--gold-2)" }}>✓</span> {i}
               </div>
             ))}

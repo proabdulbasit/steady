@@ -6,14 +6,14 @@ function ChatShellFallback() {
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <aside
         aria-hidden="true"
+        className="surface-chrome"
         style={{
           width: "280px",
           flexShrink: 0,
           borderRight: "1px solid var(--line)",
-          background: "var(--bg-elev)",
         }}
       />
-      <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: "14px" }}>
+      <main className="surface-chrome" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: "14px" }}>
         Loading…
       </main>
     </div>

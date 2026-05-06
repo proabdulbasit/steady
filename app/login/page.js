@@ -38,16 +38,16 @@ export default function LoginPage() {
         <aside className="auth-side">
           <div>
             <div className="eyebrow" style={{ color: "var(--gold-2)", marginBottom: 14 }}>Welcome back</div>
-            <h1 className="h2 serif" style={{ color: "#F1E7D7", margin: "0 0 14px" }}>
+            <h1 className="h2 serif" style={{ color: "var(--on-feature)", margin: "0 0 14px" }}>
               Sign back in to your Steady account.
             </h1>
-            <p style={{ color: "rgba(241,231,215,0.78)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
+            <p style={{ color: "var(--on-feature-2)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
               Your plan, profile, daily usage and billing all live here — across every device.
             </p>
           </div>
           <div style={{ display: "grid", gap: 10, marginTop: 28 }}>
             {["Profile with plan details", "Daily usage tracking", "Stripe-managed billing", "Admin access where granted"].map((i) => (
-              <div key={i} style={{ fontSize: 13, color: "rgba(241,231,215,0.85)", display: "flex", gap: 10, alignItems: "center" }}>
+              <div key={i} style={{ fontSize: 13, color: "var(--on-feature-2)", display: "flex", gap: 10, alignItems: "center" }}>
                 <span style={{ color: "var(--gold-2)" }}>✓</span> {i}
               </div>
             ))}

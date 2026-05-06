@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GoldButton, PageShell } from "../../components/steady-ui";
+import { GoldButton, GhostButton, PageShell } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
 import { INDUSTRY_OPTIONS } from "../../lib/industry-prompts";
 
@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [pwdMsg, setPwdMsg] = useState("");
   const [pwdSaving, setPwdSaving] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState("");
@@ -36,144 +37,267 @@ export default function ProfilePage() {
     }
   }, [profileLoading, isAuthenticated, router]);
 
+  function openPasswordModal() {
+    setPwdMsg("");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordModalOpen(true);
+  }
+
+  function closePasswordModal() {
+    if (pwdSaving) return;
+    setPasswordModalOpen(false);
+    setPwdMsg("");
+  }
+
+  async function submitPasswordChange() {
+    setPwdMsg("");
+    if (!currentPassword || !newPassword) {
+      setPwdMsg("Error: Fill in current and new passwords.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPwdMsg("Error: New password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdMsg("Error: New passwords do not match.");
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      await changePassword({ currentPassword, newPassword });
+      setPwdMsg("");
+      setPasswordModalOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      setPwdMsg(`Error: ${err.message || "Could not update password."}`);
+    } finally {
+      setPwdSaving(false);
+    }
+  }
+
   if (!isAuthenticated) return null;
 
-  return (
-    <PageShell eyebrow="Profile" title="Your account and plan" description="Manage your account details, view your current subscription, and monitor daily usage.">
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "16px" }}>
-        <div style={cardStyle}>
-          <div style={headingStyle}>Account</div>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" style={inputStyle} />
-          <input value={profile.email} disabled style={{ ...inputStyle, opacity: 0.7 }} />
-          <select
-            value={industry}
-            onChange={(e) => setIndustry(e.target.value)}
-            style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
-            aria-label="Industry"
-          >
-            {INDUSTRY_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <GoldButton
-              onClick={async () => {
-                setSaving(true);
-                await saveProfile({ name, industry });
-                setSaving(false);
-              }}
-              disabled={saving}
-            >
-              {saving ? "Saving..." : "Save Profile"}
-            </GoldButton>
-            <button onClick={logout} style={secondaryButton}>Log Out</button>
-          </div>
-          <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid var(--line)" }}>
-            <div style={{ ...headingStyle, fontSize: "18px", marginBottom: "10px" }}>Password</div>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Current password"
-              style={inputStyle}
-              autoComplete="current-password"
-            />
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="New password"
-              style={inputStyle}
-              autoComplete="new-password"
-            />
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-              style={inputStyle}
-              autoComplete="new-password"
-            />
-            {pwdMsg && (
-              <div
-                style={{
-                  ...(pwdMsg.startsWith("Error") ? errorStyle : successStyle),
-                  marginBottom: "10px",
-                }}
-              >
-                {pwdMsg}
-              </div>
-            )}
-            <GoldButton
-              onClick={async () => {
-                setPwdMsg("");
-                if (!currentPassword || !newPassword) {
-                  setPwdMsg("Error: Fill in current and new passwords.");
-                  return;
-                }
-                if (newPassword.length < 6) {
-                  setPwdMsg("Error: New password must be at least 6 characters.");
-                  return;
-                }
-                if (newPassword !== confirmPassword) {
-                  setPwdMsg("Error: New passwords do not match.");
-                  return;
-                }
-                setPwdSaving(true);
-                try {
-                  await changePassword({ currentPassword, newPassword });
-                  setCurrentPassword("");
-                  setNewPassword("");
-                  setConfirmPassword("");
-                  setPwdMsg("Password updated.");
-                } catch (err) {
-                  setPwdMsg(`Error: ${err.message || "Could not update password."}`);
-                } finally {
-                  setPwdSaving(false);
-                }
-              }}
-              disabled={pwdSaving}
-            >
-              {pwdSaving ? "Updating..." : "Update password"}
-            </GoldButton>
-          </div>
+  const integrationsConnected = profile.integrations?.filter((item) => item.status === "connected").length || 0;
 
-          <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid var(--line)" }}>
-            <div style={{ ...headingStyle, fontSize: "18px", marginBottom: "10px" }}>Danger zone</div>
-            {deleteMsg ? (
-              <div style={{ ...(deleteMsg.startsWith("Error") ? errorStyle : successStyle), marginBottom: "10px" }}>{deleteMsg}</div>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setDeleteOpen(true)}
-              style={{
-                width: "100%",
-                border: "1px solid rgba(229,115,115,0.35)",
-                background: "rgba(229,115,115,0.08)",
-                color: "#F1B1B1",
-                borderRadius: "12px",
-                padding: "14px 16px",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                fontWeight: 700,
-              }}
-            >
-              Delete account
-            </button>
-          </div>
+  return (
+    <PageShell
+      eyebrow="Profile"
+      title="Your account and plan"
+      description="Manage your account details, view your current subscription, and monitor daily usage."
+    >
+      <div className="profile-admin">
+        {/* Quick stats — admin-style summary */}
+        <div className="profile-admin-stats">
+          <AdminStat label="Plan" value={profile.planName || "—"} hint="Subscription" />
+          <AdminStat
+            label="Usage today"
+            value={isUnlimited ? "Unlimited" : String(profile.questionsUsed ?? "—")}
+            hint={isUnlimited ? "No daily cap on your tier" : `${profile.questionsRemaining ?? 0} remaining today`}
+          />
+          <AdminStat
+            label="Status"
+            value={formatStatus(profile.subscriptionStatus)}
+            hint={`${integrationsConnected} integration${integrationsConnected === 1 ? "" : "s"} connected`}
+          />
         </div>
-        <div style={cardStyle}>
-          <div style={headingStyle}>Plan & Usage</div>
-          <div style={statLine}><strong>{profile.planName}</strong></div>
-          <div style={statLine}>Subscription: {profile.subscriptionStatus}</div>
-          <div style={statLine}>Used today: {isUnlimited ? "Unlimited" : profile.questionsUsed}</div>
-          <div style={statLine}>Remaining today: {isUnlimited ? "Unlimited" : profile.questionsRemaining}</div>
-          <div style={statLine}>Connected integrations: {profile.integrations?.filter((item) => item.status === "connected").length || 0}</div>
-          <GoldButton onClick={() => router.push("/pricing")} style={{ width: "100%", marginTop: "10px" }}>Manage Plan</GoldButton>
+
+        <div className="profile-admin-grid">
+          {/* Account & security */}
+          <section className="profile-admin-panel surface-chrome card-section">
+            <div className="profile-admin-panel-head">
+              <div>
+                <div className="profile-admin-panel-kicker">Settings</div>
+                <h2 className="profile-admin-panel-title serif">Account</h2>
+                <p className="profile-admin-panel-meta">Public profile fields used across Steady.</p>
+              </div>
+            </div>
+
+            <div className="profile-admin-fields">
+              <div>
+                <label className="label" htmlFor="profile-name">Full name</label>
+                <input
+                  id="profile-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Full name"
+                  className="input"
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="profile-email">Email</label>
+                <input id="profile-email" value={profile.email} disabled className="input" style={{ opacity: 0.72 }} />
+              </div>
+              <div>
+                <label className="label" htmlFor="profile-industry">Industry</label>
+                <select
+                  id="profile-industry"
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value)}
+                  className="input select"
+                  style={{ appearance: "none", cursor: "pointer" }}
+                  aria-label="Industry"
+                >
+                  {INDUSTRY_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="profile-admin-actions">
+              <GoldButton
+                onClick={async () => {
+                  setSaving(true);
+                  await saveProfile({ name, industry });
+                  setSaving(false);
+                }}
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </GoldButton>
+              <GhostButton type="button" onClick={logout}>
+                Log out
+              </GhostButton>
+            </div>
+
+            <div className="profile-admin-divider" />
+
+            <div className="profile-admin-subsection">
+              <div className="profile-admin-subsection-head">
+                <div>
+                  <div className="profile-admin-panel-kicker">Security</div>
+                  <h3 className="profile-admin-subtitle serif">Password</h3>
+                  <p className="profile-admin-panel-meta">Use a strong password you don’t reuse elsewhere.</p>
+                </div>
+                <GhostButton type="button" className="btn-sm" onClick={openPasswordModal}>
+                  Change password
+                </GhostButton>
+              </div>
+            </div>
+
+            <div className="profile-admin-divider" />
+
+            <div className="profile-admin-subsection">
+              <div className="profile-admin-panel-kicker">Danger zone</div>
+              <h3 className="profile-admin-subtitle serif">Delete account</h3>
+              <p className="profile-admin-panel-meta">Permanently remove your account and saved chats. This cannot be undone.</p>
+              {deleteMsg ? (
+                <div style={{ ...(deleteMsg.startsWith("Error") ? errorStyle : successStyle), marginTop: 12 }}>{deleteMsg}</div>
+              ) : null}
+              <button type="button" onClick={() => setDeleteOpen(true)} className="profile-admin-danger-btn">
+                Delete account
+              </button>
+            </div>
+          </section>
+
+          {/* Plan & usage */}
+          <section className="profile-admin-panel surface-chrome card-section">
+            <div className="profile-admin-panel-head">
+              <div>
+                <div className="profile-admin-panel-kicker">Billing</div>
+                <h2 className="profile-admin-panel-title serif">Plan &amp; usage</h2>
+                <p className="profile-admin-panel-meta">Subscription status and daily question limits.</p>
+              </div>
+              <span className="profile-admin-plan-chip">{profile.planName}</span>
+            </div>
+
+            <dl className="profile-admin-metrics">
+              <div className="profile-admin-metric">
+                <dt>Subscription</dt>
+                <dd>{formatStatus(profile.subscriptionStatus)}</dd>
+              </div>
+              <div className="profile-admin-metric">
+                <dt>Used today</dt>
+                <dd>{isUnlimited ? "Unlimited" : String(profile.questionsUsed ?? "—")}</dd>
+              </div>
+              <div className="profile-admin-metric">
+                <dt>Remaining today</dt>
+                <dd>{isUnlimited ? "Unlimited" : String(profile.questionsRemaining ?? "—")}</dd>
+              </div>
+              <div className="profile-admin-metric">
+                <dt>Integrations</dt>
+                <dd>{integrationsConnected} connected</dd>
+              </div>
+            </dl>
+
+            <GoldButton type="button" onClick={() => router.push("/pricing")} style={{ width: "100%", marginTop: 8 }}>
+              Manage plan
+            </GoldButton>
+          </section>
         </div>
       </div>
+
+      {passwordModalOpen ? (
+        <Modal
+          title="Change password"
+          onClose={closePasswordModal}
+          footer={
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={closePasswordModal}
+                disabled={pwdSaving}
+                style={{ ...secondaryButtonModal, opacity: pwdSaving ? 0.55 : 1, cursor: pwdSaving ? "not-allowed" : "pointer" }}
+              >
+                Cancel
+              </button>
+              <GoldButton type="button" onClick={submitPasswordChange} disabled={pwdSaving}>
+                {pwdSaving ? "Updating..." : "Update password"}
+              </GoldButton>
+            </div>
+          }
+        >
+          <div style={{ display: "grid", gap: 14 }}>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--ink-3)", lineHeight: 1.55 }}>
+              Enter your current password once, then your new password twice to confirm.
+            </p>
+            <div>
+              <label className="label" htmlFor="pwd-current">Current password</label>
+              <input
+                id="pwd-current"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="input"
+                autoComplete="current-password"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="pwd-new">New password</label>
+              <input
+                id="pwd-new"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="input"
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="pwd-confirm">Confirm new password</label>
+              <input
+                id="pwd-confirm"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="input"
+                autoComplete="new-password"
+              />
+            </div>
+            {pwdMsg ? (
+              <div style={{ ...(pwdMsg.startsWith("Error") ? errorStyle : successStyle), margin: 0 }}>{pwdMsg}</div>
+            ) : null}
+          </div>
+        </Modal>
+      ) : null}
 
       {deleteOpen ? (
         <Modal
@@ -185,7 +309,7 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => setDeleteOpen(false)}
                 disabled={deleteBusy}
-                style={{ ...secondaryButton, opacity: deleteBusy ? 0.6 : 1, cursor: deleteBusy ? "not-allowed" : "pointer" }}
+                style={{ ...secondaryButtonModal, opacity: deleteBusy ? 0.6 : 1, cursor: deleteBusy ? "not-allowed" : "pointer" }}
               >
                 Cancel
               </button>
@@ -209,7 +333,7 @@ export default function ProfilePage() {
                 style={{
                   border: "none",
                   background: "linear-gradient(135deg,#E45A5A,#B83C3C)",
-                  color: "#0F0D0A",
+                  color: "#fff",
                   borderRadius: "12px",
                   padding: "14px 18px",
                   cursor: deleteBusy ? "not-allowed" : "pointer",
@@ -229,8 +353,206 @@ export default function ProfilePage() {
           </div>
         </Modal>
       ) : null}
+
+      <style>{`
+        .profile-admin {
+          display: grid;
+          gap: 22px;
+        }
+        .profile-admin-stats {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+        }
+        .profile-admin-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+          gap: 20px;
+          align-items: start;
+        }
+        .profile-admin-panel.card-section {
+          border: 1px solid var(--line);
+          border-radius: var(--radius-lg);
+          padding: 24px;
+          box-shadow: var(--shadow-sm);
+        }
+        .profile-admin-panel-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 14px;
+          margin-bottom: 20px;
+        }
+        .profile-admin-panel-kicker {
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: var(--gold);
+          margin-bottom: 8px;
+        }
+        .profile-admin-panel-title {
+          font-size: clamp(22px, 2.2vw, 26px);
+          font-weight: 500;
+          color: var(--ink);
+          margin: 0 0 8px;
+          line-height: 1.15;
+        }
+        .profile-admin-panel-meta {
+          margin: 0;
+          font-size: 14px;
+          color: var(--ink-3);
+          line-height: 1.55;
+          max-width: 44ch;
+        }
+        .profile-admin-plan-chip {
+          flex-shrink: 0;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          padding: 8px 12px;
+          border-radius: var(--radius-pill);
+          background: var(--gold-soft);
+          border: 1px solid var(--gold-ring);
+          color: var(--gold);
+        }
+        .profile-admin-fields {
+          display: grid;
+          gap: 14px;
+        }
+        .profile-admin-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 20px;
+        }
+        .profile-admin-divider {
+          height: 1px;
+          background: var(--line);
+          margin: 26px 0;
+        }
+        .profile-admin-subsection-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+        .profile-admin-subtitle {
+          font-size: 18px;
+          font-weight: 500;
+          color: var(--ink);
+          margin: 0 0 8px;
+        }
+        .profile-admin-metrics {
+          margin: 0;
+          padding: 0;
+          display: grid;
+          gap: 0;
+          border: 1px solid var(--line);
+          border-radius: var(--radius-md);
+          overflow: hidden;
+          background: color-mix(in srgb, var(--bg-soft) 40%, transparent);
+        }
+        .profile-admin-metric {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 12px;
+          align-items: baseline;
+          padding: 14px 16px;
+          border-bottom: 1px solid var(--line);
+        }
+        .profile-admin-metric:last-child {
+          border-bottom: none;
+        }
+        .profile-admin-metric dt {
+          margin: 0;
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--ink-3);
+        }
+        .profile-admin-metric dd {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--ink);
+          text-align: right;
+        }
+        .profile-admin-stat-card {
+          border: 1px solid var(--line);
+          border-radius: var(--radius-md);
+          padding: 16px 18px;
+          background: color-mix(in srgb, var(--bg-soft) 35%, transparent);
+        }
+        .profile-admin-stat-label {
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--ink-3);
+          margin-bottom: 8px;
+        }
+        .profile-admin-stat-value {
+          font-family: "Fraunces", Georgia, serif;
+          font-size: clamp(18px, 2vw, 22px);
+          color: var(--ink);
+          line-height: 1.15;
+          margin-bottom: 6px;
+        }
+        .profile-admin-stat-hint {
+          font-size: 13px;
+          color: var(--ink-3);
+          margin: 0;
+          line-height: 1.45;
+        }
+        .profile-admin-danger-btn {
+          width: 100%;
+          margin-top: 14px;
+          border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+          background: var(--danger-soft);
+          color: var(--danger);
+          border-radius: 12px;
+          padding: 14px 16px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+          font-size: 14px;
+          transition: background 150ms ease, border-color 150ms ease;
+        }
+        .profile-admin-danger-btn:hover {
+          border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+          background: color-mix(in srgb, var(--danger) 14%, transparent);
+        }
+        @media (max-width: 980px) {
+          .profile-admin-stats {
+            grid-template-columns: 1fr;
+          }
+          .profile-admin-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </PageShell>
   );
+}
+
+function AdminStat({ label, value, hint }) {
+  return (
+    <div className="profile-admin-stat-card">
+      <div className="profile-admin-stat-label">{label}</div>
+      <div className="profile-admin-stat-value">{value}</div>
+      {hint ? <p className="profile-admin-stat-hint">{hint}</p> : null}
+    </div>
+  );
+}
+
+function formatStatus(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "—";
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
 function Modal({ title, onClose, children, footer }) {
@@ -253,9 +575,9 @@ function Modal({ title, onClose, children, footer }) {
       }}
     >
       <div
+        className="surface-chrome"
         style={{
-          width: "min(560px, 94vw)",
-          background: "var(--bg-elev)",
+          width: "min(480px, 94vw)",
           border: "1px solid var(--line)",
           borderRadius: "18px",
           boxShadow: "var(--shadow-lg)",
@@ -263,7 +585,16 @@ function Modal({ title, onClose, children, footer }) {
         }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+        <div
+          style={{
+            padding: "16px 16px 12px",
+            borderBottom: "1px solid var(--line)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+          }}
+        >
           <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--ink)" }}>{title}</div>
           <button
             type="button"
@@ -291,22 +622,26 @@ function Modal({ title, onClose, children, footer }) {
   );
 }
 
-const cardStyle = { background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "18px", padding: "24px" };
-const headingStyle = { fontSize: "22px", color: "var(--ink)", marginBottom: "12px", fontFamily: "Fraunces, serif" };
-const inputStyle = { width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--line)", borderRadius: "10px", padding: "12px 14px", color: "var(--ink)", fontSize: "14px", fontFamily: "inherit", marginBottom: "10px" };
-const statLine = { fontSize: "14px", color: "var(--ink-2)", marginBottom: "8px" };
-const secondaryButton = { background: "none", border: "1px solid var(--line-strong)", color: "var(--ink-2)", borderRadius: "10px", padding: "14px 18px", cursor: "pointer", fontFamily: "inherit" };
+const secondaryButtonModal = {
+  background: "none",
+  border: "1px solid var(--line-strong)",
+  color: "var(--ink-2)",
+  borderRadius: "12px",
+  padding: "14px 18px",
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
 const errorStyle = {
   background: "rgba(229,115,115,0.08)",
   border: "1px solid rgba(229,115,115,0.25)",
-  color: "#F1B1B1",
+  color: "var(--danger)",
   borderRadius: "12px",
   padding: "12px 14px",
 };
 const successStyle = {
   background: "rgba(120,176,140,0.1)",
   border: "1px solid rgba(120,176,140,0.35)",
-  color: "#C5E8CC",
+  color: "var(--ink-2)",
   borderRadius: "12px",
   padding: "12px 14px",
 };

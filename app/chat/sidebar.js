@@ -1,20 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useChatHistory } from "./chat-history-context";
 import { deleteConversation, updateConversation } from "../../lib/chat-client";
 import { useSteady } from "../../components/steady-provider";
 
-export default function ChatSidebar() {
+export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeId = searchParams?.get("c") || "";
   const { conversations, loading, createNewChat, refresh } = useChatHistory();
   const { authToken } = useSteady();
+  const [mounted, setMounted] = useState(false);
   const [menuForId, setMenuForId] = useState("");
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const [menuPos, setMenuPos] = useState(null); // { top, left }
   const [menuChat, setMenuChat] = useState(null);
+  const menuRef = useRef(null);
   const [toast, setToast] = useState("");
   const toastTimerRef = useRef(null);
   const [shareChat, setShareChat] = useState(null); // { id, title }
@@ -24,12 +28,17 @@ export default function ChatSidebar() {
   const items = useMemo(() => conversations || [], [conversations]);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     function onKeyDown(e) {
       if (e.key === "Escape") {
         setMenuForId("");
         setShareChat(null);
         setRenameChat(null);
         setDeleteChat(null);
+        onMobileClose();
       }
     }
     function onClickOutside(e) {
@@ -129,24 +138,83 @@ export default function ChatSidebar() {
   useEffect(() => {
     if (!menuForId) {
       setMenuAnchor(null);
+      setMenuPos(null);
       setMenuChat(null);
     }
   }, [menuForId]);
 
+  useEffect(() => {
+    if (!menuForId || !menuAnchor) return;
+    const gutter = 8;
+    // Prefer opening to the RIGHT of the kebab (like before).
+    // If it would overflow, flip to the left.
+    const preferredTop = menuAnchor.top - 2;
+    const rightSideLeft = menuAnchor.right + 12;
+    const leftSideLeft = menuAnchor.left - 12 - 220;
+    const preferredLeft = rightSideLeft;
+    setMenuPos({ top: Math.max(gutter, preferredTop), left: Math.max(gutter, preferredLeft) });
+  }, [menuAnchor, menuForId]);
+
+  useEffect(() => {
+    if (!menuForId || !menuAnchor || !menuPos) return;
+    const el = menuRef.current;
+    if (!el) return;
+
+    const gutter = 8;
+    const width = el.offsetWidth || 220;
+    const height = el.offsetHeight || 190;
+
+    // Prefer right side, flip to left if needed.
+    const rightSideLeft = menuAnchor.right + 12;
+    const leftSideLeft = menuAnchor.left - 12 - width;
+    const wantedLeft =
+      rightSideLeft + width <= window.innerWidth - gutter ? rightSideLeft : leftSideLeft;
+
+    // Prefer aligning the top edge with the kebab (feels "attached").
+    const wantedTop = menuAnchor.top - 2;
+
+    const left = Math.min(Math.max(wantedLeft, gutter), window.innerWidth - width - gutter);
+    const top = Math.min(Math.max(wantedTop, gutter), window.innerHeight - height - gutter);
+
+    if (left !== menuPos.left || top !== menuPos.top) setMenuPos({ top, left });
+  }, [menuAnchor, menuForId, menuPos]);
+
   return (
     <aside
-      className="steady-chat-sidebar"
+      className={`steady-chat-sidebar surface-chrome ${mobileOpen ? "is-open" : ""}`}
       style={{
         width: "280px",
         flexShrink: 0,
         borderRight: "1px solid var(--line)",
-        background: "var(--bg-elev)",
         position: "sticky",
-        top: 0,
-        height: "100vh",
-        overflow: "visible",
+        top: "var(--app-header-h)",
+        height: "calc(100vh - var(--app-header-h))",
+        overflowY: "auto",
+        overflowX: "hidden",
       }}
     >
+      {/* Mobile backdrop + drawer close */}
+      {mounted && mobileOpen
+        ? createPortal(
+            <button
+              type="button"
+              aria-label="Close chat history"
+              onClick={onMobileClose}
+              className="chat-sidebar-backdrop"
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.45)",
+                border: "none",
+                padding: 0,
+                margin: 0,
+                cursor: "pointer",
+                zIndex: 999998,
+              }}
+            />,
+            document.body
+          )
+        : null}
       <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--line)" }}>
         <button
           onClick={createNewChat}
@@ -173,7 +241,7 @@ export default function ChatSidebar() {
         </button>
       </div>
 
-      <div style={{ padding: "10px 10px 14px", height: "calc(100vh - 66px)", overflowY: "auto" }}>
+      <div style={{ padding: "10px 10px 14px", height: "auto", overflowY: "auto" }}>
         <div style={{ fontSize: "10px", letterSpacing: "2px", textTransform: "uppercase", color: "var(--ink-3)", padding: "6px 6px 10px" }}>
           Recent chats
         </div>
@@ -256,7 +324,7 @@ export default function ChatSidebar() {
                       height: "28px",
                       borderRadius: "10px",
                       border: "1px solid var(--line)",
-                      background: isActive ? "var(--gold-soft)" : "var(--bg-elev)",
+                      background: isActive ? "var(--gold-soft)" : "color-mix(in srgb, var(--bg-soft) 55%, transparent)",
                       color: isActive ? "var(--gold)" : "var(--ink-2)",
                       cursor: "pointer",
                       display: "flex",
@@ -265,9 +333,12 @@ export default function ChatSidebar() {
                       opacity: menuForId === c.id ? 1 : 0,
                       pointerEvents: menuForId === c.id ? "auto" : "none",
                       transition: "opacity 120ms ease",
+                      padding: 0,
                     }}
                   >
-                    …
+                    <span aria-hidden="true" style={{ display: "block", lineHeight: 1, fontSize: 18, transform: "translateY(-1px)" }}>
+                      ⋯
+                    </span>
                   </button>
                 </div>
               );
@@ -282,38 +353,42 @@ export default function ChatSidebar() {
         )}
       </div>
 
-      {menuForId && menuAnchor && menuChat ? (
-        <div
-          data-chat-floating-menu
-          role="menu"
-          aria-label="Chat options"
-          style={{
-            position: "fixed",
-            top: Math.max(8, menuAnchor.top - 2),
-            left: menuAnchor.right + 12,
-            width: "220px",
-            borderRadius: "14px",
-            border: "1px solid var(--line)",
-            background: "var(--bg-elev)",
-            boxShadow: "var(--shadow-lg)",
-            padding: "8px",
-            zIndex: 9999,
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <MenuItem label="Share" onClick={() => openShareModal(menuChat)} />
-          <MenuItem label="Rename" onClick={() => openRenameModal(menuChat)} />
-          <MenuItem
-            label={menuChat.pinned ? "Unpin chat" : "Pin chat"}
-            onClick={() => onTogglePin(menuChat.id, Boolean(menuChat.pinned))}
-          />
-          <div style={{ height: "1px", background: "var(--line)", margin: "8px 0" }} />
-          <MenuItem label="Delete" danger onClick={() => openDeleteModal(menuChat)} />
-        </div>
-      ) : null}
+      {mounted && menuForId && menuAnchor && menuChat && menuPos
+        ? createPortal(
+            <div
+              data-chat-floating-menu
+              role="menu"
+              aria-label="Chat options"
+              ref={menuRef}
+              style={{
+                position: "fixed",
+                top: menuPos.top,
+                left: menuPos.left,
+                width: "220px",
+                borderRadius: "14px",
+                border: "1px solid var(--line)",
+                background: "var(--bg-elev)",
+                boxShadow: "var(--shadow-lg)",
+                padding: "8px",
+                zIndex: 999999,
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <MenuItem label="Share" onClick={() => openShareModal(menuChat)} />
+              <MenuItem label="Rename" onClick={() => openRenameModal(menuChat)} />
+              <MenuItem
+                label={menuChat.pinned ? "Unpin chat" : "Pin chat"}
+                onClick={() => onTogglePin(menuChat.id, Boolean(menuChat.pinned))}
+              />
+              <div style={{ height: "1px", background: "var(--line)", margin: "8px 0" }} />
+              <MenuItem label="Delete" danger onClick={() => openDeleteModal(menuChat)} />
+            </div>,
+            document.body
+          )
+        : null}
 
       {shareChat ? (
         <Modal title={shareChat.title} onClose={() => setShareChat(null)} footer={null}>
@@ -456,8 +531,21 @@ export default function ChatSidebar() {
       ) : null}
 
       <style>{`
+        /* Mobile drawer */
         @media (max-width: 960px){
-          .steady-chat-sidebar{display:none !important}
+          .steady-chat-sidebar{
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            height: 100vh !important;
+            z-index: 999999 !important;
+            transform: translateX(-105%);
+            transition: transform 180ms ease;
+            box-shadow: var(--shadow-lg);
+          }
+          .steady-chat-sidebar.is-open{
+            transform: translateX(0);
+          }
         }
 
         [data-chat-menu-root]:hover .steady-chat-kebab{
@@ -502,7 +590,9 @@ function MenuItem({ label, onClick, danger = false }) {
 }
 
 function Modal({ title, onClose, children, footer }) {
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -510,7 +600,7 @@ function Modal({ title, onClose, children, footer }) {
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.55)",
-        zIndex: 10000,
+        zIndex: 1000000,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -564,7 +654,8 @@ function Modal({ title, onClose, children, footer }) {
         <div style={{ padding: "16px" }}>{children}</div>
         {footer ? <div style={{ padding: "14px 16px 16px", borderTop: "1px solid var(--line)" }}>{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

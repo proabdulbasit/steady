@@ -157,6 +157,31 @@ export function AppChrome({ children }) {
   const pathname = usePathname();
   const { profile, isAuthenticated } = useSteady();
   const [open, setOpen] = useState(false);
+  const isChat = pathname?.startsWith("/chat");
+  const hideFooter = isChat;
+
+  useEffect(() => {
+    // On /chat we want a true app layout: sidebar + thread scroll independently, not the page.
+    if (!pathname?.startsWith("/chat")) {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      return;
+    }
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    // Keep CSS var in sync with actual header height (responsive).
+    const header = document.querySelector(".app-header");
+    if (header && header instanceof HTMLElement) {
+      document.documentElement.style.setProperty("--app-header-h", `${header.offsetHeight}px`);
+    }
+
+    return () => {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    };
+  }, [pathname]);
 
   const navItems = [
     { href: "/", label: "Home" },
@@ -239,28 +264,32 @@ export function AppChrome({ children }) {
         )}
       </header>
 
-      <div style={{ flex: 1 }}>{children}</div>
+      <div style={{ flex: 1, minHeight: 0, overflow: isChat ? "hidden" : "visible" }}>
+        {children}
+      </div>
 
-      <footer className="app-footer">
-        <div className="container" style={{ display: "grid", gap: 24, gridTemplateColumns: "2fr 1fr 1fr 1fr" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <div className="brand-mark" style={{ width: 36, height: 36, fontSize: 18 }}>S</div>
-              <div className="serif" style={{ fontSize: 20, color: "var(--ink)" }}>Steady</div>
+      {!hideFooter && (
+        <footer className="app-footer">
+          <div className="container footer-grid" style={{ display: "grid", gap: 24 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <div className="brand-mark" style={{ width: 36, height: 36, fontSize: 18 }}>S</div>
+                <div className="serif" style={{ fontSize: 20, color: "var(--ink)" }}>Steady</div>
+              </div>
+              <p style={{ fontSize: 14, color: "var(--ink-3)", maxWidth: 360, margin: 0 }}>
+                Direct, plain-spoken answers for the people running real businesses. Built to be useful in two minutes.
+              </p>
             </div>
-            <p style={{ fontSize: 14, color: "var(--ink-3)", maxWidth: 360, margin: 0 }}>
-              Direct, plain-spoken answers for the people running real businesses. Built to be useful in two minutes.
-            </p>
+            <FooterCol title="Product" links={[["/", "Home"], ["/pricing", "Pricing"], ["/chat", "Chat"]]} />
+            <FooterCol title="Account" links={[["/login", "Sign in"], ["/register", "Register"], ["/profile", "Profile"]]} />
+            <FooterCol title="Legal" links={[["/privacy", "Privacy"], ["/terms", "Terms"]]} />
           </div>
-          <FooterCol title="Product" links={[["/", "Home"], ["/pricing", "Pricing"], ["/chat", "Chat"]]} />
-          <FooterCol title="Account" links={[["/login", "Sign in"], ["/register", "Register"], ["/profile", "Profile"]]} />
-          <FooterCol title="Legal" links={[["/privacy", "Privacy"], ["/terms", "Terms"]]} />
-        </div>
-        <div className="container" style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--line)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10, fontSize: 12, color: "var(--ink-3)" }}>
-          <div>© {new Date().getFullYear()} Steady. Business advice, not legal counsel.</div>
-          <div>Made for restaurants, auto shops, pawnshops & every other real business.</div>
-        </div>
-      </footer>
+          <div className="container" style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--line)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10, fontSize: 12, color: "var(--ink-3)" }}>
+            <div>© {new Date().getFullYear()} Steady. Business advice, not legal counsel.</div>
+            <div>Made for restaurants, auto shops, pawnshops & every other real business.</div>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

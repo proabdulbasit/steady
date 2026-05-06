@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BUSINESS_SYSTEM, FREE_SYSTEM, PageShell, PREMIUM_SYSTEM, formatMessage } from "../../components/steady-ui";
+import { BUSINESS_SYSTEM, FREE_SYSTEM, PREMIUM_SYSTEM, formatMessage } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
 import { useRouter } from "next/navigation";
 import { appendConversationMessages, createConversation, fetchConversation } from "../../lib/chat-client";
@@ -240,71 +240,160 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   }
 
   return (
-    <PageShell
-      eyebrow="Chat"
-      title="Ask Steady anything"
-      description={
-        remainingQuestions === null
-          ? "Unlimited chat is active on your plan."
-          : isPremium
-            ? `${remainingQuestions} questions remaining today.`
-            : `${remainingQuestions} free questions remaining today.`
-      }
-    >
-      {conversationTitle ? (
-        <div style={{ marginBottom: "12px", fontSize: "12px", color: "var(--ink-3)" }}>
-          <span style={{ color: "var(--gold)", letterSpacing: "2px", textTransform: "uppercase", fontSize: "10px", marginRight: "8px" }}>Chat</span>
-          <span>{conversationTitle}</span>
-        </div>
-      ) : null}
-      <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "18px", padding: "16px", minHeight: "320px" }}>
-        <div style={{ display: "grid", gap: "16px" }}>
-          {messages.map((msg, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-              <div style={{ maxWidth: "85%", background: msg.role === "user" ? "var(--gradient-gold)" : "var(--bg-soft)", border: msg.role === "assistant" ? "1px solid var(--line)" : "none", borderRadius: "16px", padding: msg.role === "user" ? "12px 16px" : "18px 20px", color: msg.role === "user" ? "#1A1410" : "var(--ink-2)" }}>
-                {msg.role === "user" ? (
-                  <div style={{ display: "grid", gap: "10px" }}>
-                    {Array.isArray(msg.attachments) && msg.attachments.length ? (
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                        {msg.attachments.map((a, idx) => (
-                          <div
-                            key={`${a.name}-${idx}`}
-                            style={{
-                              background: "rgba(15,13,10,0.16)",
-                              border: "1px solid rgba(15,13,10,0.18)",
-                              borderRadius: "16px",
-                              padding: "8px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "10px",
-                            }}
-                          >
-                            {a.kind === "image" && a.base64 && a.mediaType ? (
-                              <img
-                                src={`data:${a.mediaType};base64,${a.base64}`}
-                                alt=""
-                                style={{ width: "62px", height: "62px", borderRadius: "14px", objectFit: "cover", border: "1px solid rgba(15,13,10,0.18)" }}
-                              />
-                            ) : (
-                              <div style={{ width: "62px", height: "62px", borderRadius: "14px", border: "1px solid rgba(15,13,10,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>
-                                FILE
-                              </div>
-                            )}
+    <div className="chat-page">
+      <div className="chat-page-head">
+        <p className="lede" style={{ margin: 0, maxWidth: 720 }}>
+          {remainingQuestions === null
+            ? "Unlimited chat is active on your plan."
+            : isPremium
+              ? `${remainingQuestions} questions remaining today.`
+              : `${remainingQuestions} free questions remaining today.`}
+        </p>
+      </div>
+
+      <div className="chat-thread">
+        {messages.length ? (
+          <div style={{ display: "grid", gap: "16px" }}>
+            {messages.map((msg, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{ maxWidth: "85%", overflowWrap: "anywhere", wordBreak: "break-word", background: msg.role === "user" ? "var(--gradient-gold)" : "var(--bg-soft)", border: "none", borderRadius: "16px", padding: msg.role === "user" ? "12px 16px" : "18px 20px", color: msg.role === "user" ? "#1A1410" : "var(--ink-2)" }}>
+                  {msg.role === "user" ? (
+                    <div style={{ display: "grid", gap: "10px" }}>
+                      {Array.isArray(msg.attachments) && msg.attachments.length ? (
+                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                          {msg.attachments.map((a, idx) => (
+                            <div
+                              key={`${a.name}-${idx}`}
+                              style={{
+                                background: "rgba(15,13,10,0.16)",
+                                border: "1px solid rgba(15,13,10,0.18)",
+                                borderRadius: "16px",
+                                padding: "8px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "10px",
+                              }}
+                            >
+                              {a.kind === "image" && a.base64 && a.mediaType ? (
+                                <img
+                                  src={`data:${a.mediaType};base64,${a.base64}`}
+                                  alt=""
+                                  style={{ width: "62px", height: "62px", borderRadius: "14px", objectFit: "cover", border: "1px solid rgba(15,13,10,0.18)" }}
+                                />
+                              ) : (
+                                <div style={{ width: "62px", height: "62px", borderRadius: "14px", border: "1px solid rgba(15,13,10,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>
+                                  FILE
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {msg.content ? <div>{msg.content}</div> : null}
+                    </div>
+                  ) : (
+                    formatMessage(msg.content)
+                  )}
+                </div>
+              </div>
+            ))}
+            {loading && <div style={{ color: "var(--ink-3)" }}>Steady is thinking...</div>}
+            <div ref={bottomRef} />
+          </div>
+        ) : (
+          <div className="chat-empty">
+            <div style={{ textAlign: "center", maxWidth: 720, width: "100%", display: "grid", justifyItems: "center", gap: 16 }}>
+              <div className="h3 serif" style={{ margin: "0 0 10px" }}>What are you working on?</div>
+              <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 15, lineHeight: 1.6 }}>
+                Describe the situation like you’d say it out loud. Steady will ask for any missing number, then give you one clear next move.
+              </p>
+              <div className="chat-composer-wrap is-centered" style={{ paddingBottom: 0 }}>
+                {attachments.length ? (
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginBottom: 12 }}>
+                    {attachments.map((a) => (
+                      <div
+                        key={a.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          background: "var(--bg-soft)",
+                          border: "1px solid var(--line)",
+                          borderRadius: "16px",
+                          padding: "8px 8px",
+                        }}
+                      >
+                        {a.kind === "image" && a.previewUrl ? (
+                          <img
+                            src={a.previewUrl}
+                            alt=""
+                            style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid var(--line)" }}
+                          />
+                        ) : (
+                          <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900 }}>
+                            FILE
                           </div>
-                        ))}
+                        )}
+                        <button
+                          type="button"
+                          aria-label="Remove attachment"
+                          onClick={() => {
+                            if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+                            setAttachments((current) => current.filter((x) => x.id !== a.id));
+                          }}
+                          style={{
+                            width: "30px",
+                            height: "30px",
+                            borderRadius: "10px",
+                            border: "1px solid var(--line)",
+                            background: "transparent",
+                            color: "var(--ink-2)",
+                            cursor: "pointer",
+                            flexShrink: 0,
+                          }}
+                        >
+                          ×
+                        </button>
                       </div>
-                    ) : null}
-                    {msg.content ? <div>{msg.content}</div> : null}
+                    ))}
                   </div>
-                ) : (
-                  formatMessage(msg.content)
-                )}
+                ) : null}
+                <div className="chat-composer surface-chrome" style={{ display: "flex", gap: "10px", alignItems: "center", border: "1px solid var(--line)", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
+                  <button
+                    type="button"
+                    aria-label="Add attachment"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ ...iconButtonStyle, cursor: "pointer" }}
+                  >
+                    +
+                  </button>
+                  <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="What's going on with your business?" style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }} />
+                  <button
+                    onClick={() => sendMessage()}
+                    disabled={(!input.trim() && !attachments.length) || loading}
+                    style={{
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "999px",
+                      border: "none",
+                      background: "var(--gradient-gold)",
+                      color: "#1A1410",
+                      opacity: (input.trim() || attachments.length) && !loading ? 1 : 0.35,
+                      cursor: (input.trim() || attachments.length) && !loading ? "pointer" : "not-allowed",
+                      fontSize: "24px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    ↑
+                  </button>
+                </div>
               </div>
             </div>
-          ))}
-          {loading && <div style={{ color: "var(--ink-3)" }}>Steady is thinking...</div>}
-          <div ref={bottomRef} />
-        </div>
+          </div>
+        )}
       </div>
       <input
         ref={fileInputRef}
@@ -352,93 +441,96 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         }}
       />
 
-      {attachments.length ? (
-        <div style={{ marginTop: "14px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          {attachments.map((a) => (
-            <div
-              key={a.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                background: "var(--bg-soft)",
-                border: "1px solid var(--line)",
-                borderRadius: "16px",
-                padding: "8px 8px",
-              }}
-            >
-              {a.kind === "image" && a.previewUrl ? (
-                <img
-                  src={a.previewUrl}
-                  alt=""
-                  style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid var(--line)" }}
-                />
-              ) : (
-                <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900 }}>
-                  FILE
+      {messages.length ? (
+        <>
+          {attachments.length ? (
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {attachments.map((a) => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    background: "var(--bg-soft)",
+                    border: "1px solid var(--line)",
+                    borderRadius: "16px",
+                    padding: "8px 8px",
+                  }}
+                >
+                  {a.kind === "image" && a.previewUrl ? (
+                    <img
+                      src={a.previewUrl}
+                      alt=""
+                      style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid var(--line)" }}
+                    />
+                  ) : (
+                    <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900 }}>
+                      FILE
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Remove attachment"
+                    onClick={() => {
+                      if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+                      setAttachments((current) => current.filter((x) => x.id !== a.id));
+                    }}
+                    style={{
+                      width: "30px",
+                      height: "30px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--line)",
+                      background: "transparent",
+                      color: "var(--ink-2)",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    ×
+                  </button>
                 </div>
-              )}
+              ))}
+            </div>
+          ) : null}
+
+          <div className="chat-composer-wrap is-docked">
+            <div className="chat-composer surface-chrome" style={{ display: "flex", gap: "10px", alignItems: "center", border: "1px solid var(--line)", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
               <button
                 type="button"
-                aria-label="Remove attachment"
-                onClick={() => {
-                  if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
-                  setAttachments((current) => current.filter((x) => x.id !== a.id));
-                }}
+                aria-label="Add attachment"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ ...iconButtonStyle, cursor: "pointer" }}
+              >
+                +
+              </button>
+              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="What's going on with your business?" style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }} />
+              <button
+                onClick={() => sendMessage()}
+                disabled={(!input.trim() && !attachments.length) || loading}
                 style={{
-                  width: "30px",
-                  height: "30px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--line)",
-                  background: "transparent",
-                  color: "var(--ink-2)",
-                  cursor: "pointer",
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "var(--gradient-gold)",
+                  color: "#1A1410",
+                  opacity: (input.trim() || attachments.length) && !loading ? 1 : 0.35,
+                  cursor: (input.trim() || attachments.length) && !loading ? "pointer" : "not-allowed",
+                  fontSize: "24px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   flexShrink: 0,
                 }}
               >
-                ×
+                ↑
               </button>
             </div>
-          ))}
-        </div>
+          </div>
+        </>
       ) : null}
 
-      <div className="chat-composer" style={{ display: "flex", gap: "10px", marginTop: "16px", alignItems: "center", background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
-        <button
-          type="button"
-          aria-label="Add attachment"
-          onClick={() => fileInputRef.current?.click()}
-          style={{ ...iconButtonStyle, cursor: "pointer" }}
-        >
-          +
-        </button>
-        <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="What's going on with your business?" style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }} />
-        {/*
-          Keep the send button on-brand even when disabled. We dim it instead of swapping colors
-          so the composer always looks consistent with the rest of the theme.
-        */}
-        <button
-          onClick={() => sendMessage()}
-          disabled={(!input.trim() && !attachments.length) || loading}
-          style={{
-            width: "48px",
-            height: "48px",
-            borderRadius: "999px",
-            border: "none",
-            background: "var(--gradient-gold)",
-            color: "#1A1410",
-            opacity: (input.trim() || attachments.length) && !loading ? 1 : 0.35,
-            cursor: (input.trim() || attachments.length) && !loading ? "pointer" : "not-allowed",
-            fontSize: "24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          ↑
-        </button>
-      </div>
       <style>{`
         @media (max-width: 768px) {
           .chat-composer {
@@ -446,7 +538,7 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
           }
         }
       `}</style>
-    </PageShell>
+    </div>
   );
 }
 
