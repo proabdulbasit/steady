@@ -130,7 +130,8 @@ router.post("/forgot-password", async (req, res) => {
     if (!frontend) {
       console.error("[auth] FRONTEND_URL (or APP_PUBLIC_URL) is not set.");
       return res.status(503).json({
-        error: "Password reset is not configured yet. Ask your administrator to set FRONTEND_URL and email (SMTP).",
+        error:
+          "Password reset is not configured yet. Ask your administrator to set FRONTEND_URL and outbound email (Mailgun or SMTP).",
       });
     }
 
