@@ -91,9 +91,11 @@ async function sendViaMailgun({ to, subject, text, html, from }) {
     const msg = data?.message || data?.error || `Mailgun HTTP ${res.status}`;
     const err = new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
     err.details = data;
+    err.status = res.status;
     throw err;
   }
-  return { ok: true };
+  // Correlate with Mailgun dashboard → Sending → Logs (delivery may still fail later).
+  return { ok: true, messageId: typeof data?.id === "string" ? data.id : undefined };
 }
 
 async function sendPasswordResetEmail({ to, resetUrl }) {
@@ -115,12 +117,20 @@ If you did not request this, you can ignore this email.`;
 
   try {
     const mg = await sendViaMailgun({ to, subject, text, html, from });
-    if (mg && mg.ok) return true;
+    if (mg && mg.ok) {
+      if (mg.messageId) {
+        console.info("[steady-mail] Mailgun accepted password reset; message id:", mg.messageId);
+      } else {
+        console.info("[steady-mail] Mailgun accepted password reset (no id in response).");
+      }
+      return true;
+    }
   } catch (e) {
     const key = typeof process.env.MAILGUN_API_KEY === "string" ? process.env.MAILGUN_API_KEY.trim() : "";
     const domain = typeof process.env.MAILGUN_DOMAIN === "string" ? process.env.MAILGUN_DOMAIN.trim() : "";
     if (key && domain) {
-      console.error("[steady-mail] Mailgun password reset failed:", e?.message || e);
+      const status = e?.status != null ? ` HTTP ${e.status}` : "";
+      console.error("[steady-mail] Mailgun password reset failed" + status + ":", e?.message || e);
     }
   }
 

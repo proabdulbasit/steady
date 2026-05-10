@@ -154,7 +154,12 @@ router.post("/forgot-password", async (req, res) => {
     const resetUrl = `${frontend}/reset-password?${qp.toString()}`;
 
     try {
-      await sendPasswordResetEmail({ to: user.email, resetUrl });
+      const sent = await sendPasswordResetEmail({ to: user.email, resetUrl });
+      if (!sent) {
+        console.error(
+          "[auth] Password reset email was not sent. Check Mailgun (domain, API region, MAILGUN_FROM) or SMTP. See Mailgun → Sending → Logs.",
+        );
+      }
     } catch (mailError) {
       console.error("[auth] Forgot-password email failed:", mailError);
     }
