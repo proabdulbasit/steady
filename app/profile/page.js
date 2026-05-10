@@ -1,14 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GoldButton, GhostButton, PageShell } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
 import { INDUSTRY_OPTIONS } from "../../lib/industry-prompts";
+import {
+  disconnectIntegration,
+  fetchInsightsList,
+  fetchIntegrationContext,
+  fetchIntegrationsStatus,
+  refreshInsightsComputation,
+  startIntegrationOAuth,
+  syncIntegrationNow,
+} from "../../lib/integrations-client";
+
+function formatUsdFromCents(cents) {
+  const n = Number(cents || 0) / 100;
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+function formatMaybeNumber(v) {
+  if (v === null || v === undefined) return "—";
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v);
+}
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, profile, saveProfile, logout, profileLoading, changePassword, deleteAccount } = useSteady();
+  const { isAuthenticated, profile, saveProfile, logout, profileLoading, changePassword, deleteAccount, authToken } = useSteady();
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("restaurant");
   const [saving, setSaving] = useState(false);
@@ -21,6 +42,19 @@ export default function ProfilePage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState("");
+  const [integrationsBusy, setIntegrationsBusy] = useState("");
+  const [integrationsError, setIntegrationsError] = useState("");
+  const [integrationsStatus, setIntegrationsStatus] = useState(null);
+  const [dataPreviewLoading, setDataPreviewLoading] = useState(false);
+  const [dataPreviewError, setDataPreviewError] = useState("");
+  const [dataPreviewContext, setDataPreviewContext] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState("");
+  const [insightsList, setInsightsList] = useState([]);
+  /** When set, user has successfully called GET /api/insights at least once (may be 0 rows). */
+  const [insightsLoadedAt, setInsightsLoadedAt] = useState(null);
+  const [insightsLastCount, setInsightsLastCount] = useState(null);
+  const [lastRecomputeResult, setLastRecomputeResult] = useState(null);
   const isUnlimited = profile.questionsRemaining === null;
 
   useEffect(() => {
@@ -79,6 +113,15 @@ export default function ProfilePage() {
       setPwdSaving(false);
     }
   }
+
+  // Hooks must run before any conditional return (Rules of Hooks).
+  const integrationRows = useMemo(() => {
+    const map = new Map((profile.integrations || []).map((x) => [x.provider, x]));
+    return [
+      { provider: "square", label: "Square", item: map.get("square") || { provider: "square", status: "disconnected" } },
+      { provider: "quickbooks", label: "QuickBooks", item: map.get("quickbooks") || { provider: "quickbooks", status: "disconnected" } },
+    ];
+  }, [profile.integrations]);
 
   if (!isAuthenticated) return null;
 
@@ -231,6 +274,371 @@ export default function ProfilePage() {
             <GoldButton type="button" onClick={() => router.push("/pricing")} style={{ width: "100%", marginTop: 8 }}>
               Manage plan
             </GoldButton>
+          </section>
+
+          {/* Integrations */}
+          <section className="profile-admin-panel surface-chrome card-section" style={{ gridColumn: "1 / -1" }}>
+            <div className="profile-admin-panel-head" style={{ marginBottom: 14 }}>
+              <div>
+                <div className="profile-admin-panel-kicker">Integrations</div>
+                <h2 className="profile-admin-panel-title serif">Connect your data</h2>
+                <p className="profile-admin-panel-meta" style={{ maxWidth: "72ch" }}>
+                  Link Square and QuickBooks so Steady can use real sales + financial data. You can disconnect anytime.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={!authToken || Boolean(integrationsBusy)}
+                onClick={async () => {
+                  if (!authToken) return;
+                  setIntegrationsError("");
+                  try {
+                    const data = await fetchIntegrationsStatus({ authToken });
+                    setIntegrationsStatus(data);
+                  } catch (e) {
+                    setIntegrationsError(e?.message || "Could not load integrations.");
+                  }
+                }}
+              >
+                Refresh
+              </button>
+            </div>
+
+            {integrationsError ? (
+              <div style={{ ...errorStyle, marginBottom: 12 }}>{integrationsError}</div>
+            ) : null}
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {integrationRows.map((row) => {
+                const status = row.item?.status || "disconnected";
+                const isConnected = status === "connected";
+                const lastSyncedAt = integrationsStatus?.providers?.[row.provider]?.lastSyncedAt || "";
+                const lastSyncStatus = integrationsStatus?.providers?.[row.provider]?.lastSyncStatus || "";
+                return (
+                  <div
+                    key={row.provider}
+                    style={{
+                      border: "1px solid var(--line)",
+                      borderRadius: 14,
+                      padding: "14px 14px",
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                      gap: 12,
+                      alignItems: "center",
+                      background: "color-mix(in srgb, var(--bg-soft) 40%, transparent)",
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: 4 }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+                        <div style={{ fontWeight: 750, color: "var(--ink)" }}>{row.label}</div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 750,
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            color: isConnected ? "var(--gold)" : "var(--ink-3)",
+                          }}
+                        >
+                          {status}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--ink-3)" }}>
+                        {isConnected ? (
+                          <>
+                            {lastSyncedAt ? `Last sync: ${new Date(lastSyncedAt).toLocaleString()}` : "Not synced yet."}
+                            {lastSyncStatus ? ` • ${lastSyncStatus}` : ""}
+                          </>
+                        ) : (
+                          "Not connected."
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      {isConnected ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={!authToken || integrationsBusy === row.provider}
+                            onClick={async () => {
+                              if (!authToken) return;
+                              setIntegrationsError("");
+                              setIntegrationsBusy(row.provider);
+                              try {
+                                await syncIntegrationNow({ provider: row.provider, authToken });
+                                const data = await fetchIntegrationsStatus({ authToken });
+                                setIntegrationsStatus(data);
+                              } catch (e) {
+                                setIntegrationsError(e?.message || "Sync failed.");
+                              } finally {
+                                setIntegrationsBusy("");
+                              }
+                            }}
+                          >
+                            {integrationsBusy === row.provider ? "Syncing..." : "Sync now"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={!authToken || integrationsBusy === row.provider}
+                            onClick={async () => {
+                              if (!authToken) return;
+                              setIntegrationsError("");
+                              setIntegrationsBusy(row.provider);
+                              try {
+                                await disconnectIntegration({ provider: row.provider, authToken });
+                                const data = await fetchIntegrationsStatus({ authToken });
+                                setIntegrationsStatus(data);
+                              } catch (e) {
+                                setIntegrationsError(e?.message || "Disconnect failed.");
+                              } finally {
+                                setIntegrationsBusy("");
+                              }
+                            }}
+                          >
+                            Disconnect
+                          </button>
+                        </>
+                      ) : (
+                        <GoldButton
+                          type="button"
+                          className="btn-sm"
+                          disabled={!authToken || integrationsBusy === row.provider}
+                          onClick={async () => {
+                            if (!authToken) return;
+                            setIntegrationsError("");
+                            setIntegrationsBusy(row.provider);
+                            try {
+                              const data = await startIntegrationOAuth({ provider: row.provider, authToken });
+                              if (data?.url) {
+                                window.location.href = data.url;
+                              } else {
+                                throw new Error("Missing authorize url.");
+                              }
+                            } catch (e) {
+                              setIntegrationsError(e?.message || "Could not start OAuth.");
+                              setIntegrationsBusy("");
+                            }
+                          }}
+                        >
+                          {integrationsBusy === row.provider ? "Opening..." : `Connect ${row.label}`}
+                        </GoldButton>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Normalized metrics + canonical summary for AI */}
+          <section className="profile-admin-panel surface-chrome card-section" style={{ gridColumn: "1 / -1" }}>
+            <div className="profile-admin-panel-head" style={{ marginBottom: 14 }}>
+              <div>
+                <div className="profile-admin-panel-kicker">Testing</div>
+                <h2 className="profile-admin-panel-title serif">AI-ready data preview</h2>
+                <p className="profile-admin-panel-meta" style={{ maxWidth: "72ch" }}>
+                  Loads the same structured context as GET <code>/api/integrations/context</code>—Square + QuickBooks metrics
+                  after you run Sync. Use this to validate normalization before prompts use it.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={!authToken || dataPreviewLoading}
+                  onClick={async () => {
+                    setDataPreviewError("");
+                    setDataPreviewLoading(true);
+                    try {
+                      const res = await fetchIntegrationContext({ authToken });
+                      setDataPreviewContext(res.context || null);
+                    } catch (e) {
+                      setDataPreviewContext(null);
+                      setDataPreviewError(e?.message || "Could not load context.");
+                    } finally {
+                      setDataPreviewLoading(false);
+                    }
+                  }}
+                >
+                  {dataPreviewLoading ? "Loading..." : "Load preview"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={!dataPreviewContext}
+                  onClick={() => {
+                    setDataPreviewContext(null);
+                    setDataPreviewError("");
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            {dataPreviewError ? <div style={{ ...errorStyle, marginBottom: 12 }}>{dataPreviewError}</div> : null}
+            {!dataPreviewContext ? (
+              <p style={{ margin: 0, fontSize: 14, color: "var(--ink-3)" }}>Tap Load preview after syncing.</p>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                  <AdminStat label="Window" value={`${dataPreviewContext.windowDays ?? "—"} days`} hint="UTC daily keys" />
+                  <AdminStat
+                    label="Square (window)"
+                    value={formatUsdFromCents(dataPreviewContext.square?.summary?.netRevenueCents)}
+                    hint={`${dataPreviewContext.square?.summary?.paymentCount ?? 0} payments • ${dataPreviewContext.square?.summary?.orderCount ?? 0} orders`}
+                  />
+                </div>
+                <div style={{ fontSize: 13, color: "var(--ink-3)", lineHeight: 1.5 }}>
+                  <strong style={{ color: "var(--ink)" }}>Sources</strong>
+                  <div>Square merchant: {dataPreviewContext.sources?.square?.profile?.businessName || "—"}</div>
+                  <div>Square locations: {(dataPreviewContext.sources?.square?.locationIds || []).length}</div>
+                  <div>QuickBooks realm: {dataPreviewContext.sources?.quickbooks?.realmId || "—"}</div>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--ink-3)", lineHeight: 1.5 }}>
+                  <strong style={{ color: "var(--ink)" }}>QuickBooks latest snapshot (profit and loss)</strong>
+                  <div>
+                    Net income:{" "}
+                    {formatMaybeNumber(dataPreviewContext.quickbooks?.latestProfitAndLoss?.profitAndLoss?.netIncome)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13, color: "var(--ink)" }}>canonicalSummary</div>
+                  <pre
+                    style={{
+                      margin: 0,
+                      padding: 12,
+                      borderRadius: 12,
+                      border: "1px solid var(--line)",
+                      background: "color-mix(in srgb, var(--bg-soft) 50%, transparent)",
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      maxHeight: 240,
+                      overflow: "auto",
+                    }}
+                  >
+                    {dataPreviewContext.canonicalSummary || "—"}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Insights */}
+          <section className="profile-admin-panel surface-chrome card-section" style={{ gridColumn: "1 / -1" }}>
+            <div className="profile-admin-panel-head" style={{ marginBottom: 14 }}>
+              <div>
+                <div className="profile-admin-panel-kicker">Testing</div>
+                <h2 className="profile-admin-panel-title serif">Insights</h2>
+                <p className="profile-admin-panel-meta" style={{ maxWidth: "72ch" }}>
+                  Loads GET <code>/api/insights</code>. An empty list after Reload means the request worked but no
+                  insight documents exist yet—usually rules did not fire (flat sandbox data). Use Recompute after sync
+                  to create rows when thresholds match.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={!authToken || insightsLoading}
+                  onClick={async () => {
+                    setInsightsError("");
+                    setInsightsLoading(true);
+                    try {
+                      const res = await fetchInsightsList({ authToken });
+                      const list = Array.isArray(res.insights) ? res.insights : [];
+                      setInsightsList(list);
+                      setInsightsLastCount(list.length);
+                      setInsightsLoadedAt(Date.now());
+                    } catch (e) {
+                      setInsightsList([]);
+                      setInsightsError(e?.message || "Could not load insights.");
+                    } finally {
+                      setInsightsLoading(false);
+                    }
+                  }}
+                >
+                  {insightsLoading ? "Loading..." : "Reload list"}
+                </button>
+                <GoldButton
+                  type="button"
+                  className="btn-sm"
+                  disabled={!authToken || insightsLoading}
+                  onClick={async () => {
+                    setInsightsError("");
+                    setInsightsLoading(true);
+                    try {
+                      const refRes = await refreshInsightsComputation({ authToken });
+                      setLastRecomputeResult(refRes?.result ?? null);
+                      const res = await fetchInsightsList({ authToken });
+                      const list = Array.isArray(res.insights) ? res.insights : [];
+                      setInsightsList(list);
+                      setInsightsLastCount(list.length);
+                      setInsightsLoadedAt(Date.now());
+                    } catch (e) {
+                      setInsightsError(e?.message || "Could not refresh insights.");
+                    } finally {
+                      setInsightsLoading(false);
+                    }
+                  }}
+                >
+                  Recompute insights
+                </GoldButton>
+              </div>
+            </div>
+            {insightsError ? <div style={{ ...errorStyle, marginBottom: 12 }}>{insightsError}</div> : null}
+            {lastRecomputeResult != null ? (
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-3)" }}>
+                Last recompute: created or updated{" "}
+                <strong style={{ color: "var(--ink)" }}>{String(lastRecomputeResult.created ?? 0)}</strong> insight
+                rule hit(s). (Many runs produce 0 if metrics are flat.)
+              </p>
+            ) : null}
+            {insightsLoadedAt != null ? (
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-2)" }}>
+                List loaded {new Date(insightsLoadedAt).toLocaleString()} ·{" "}
+                <strong style={{ color: "var(--ink)" }}>{insightsLastCount ?? insightsList.length}</strong> row(s) from
+                the server.
+              </p>
+            ) : null}
+            {!insightsList.length ? (
+              <p style={{ margin: 0, fontSize: 14, color: "var(--ink-3)", lineHeight: 1.55 }}>
+                {insightsLoadedAt == null
+                  ? "Tap Reload list to fetch from the API (check Network if nothing changes—set NEXT_PUBLIC_BACKEND_URL)."
+                  : "You have 0 insight documents. Sync Square/QuickBooks, open AI preview to confirm metrics, then Recompute. Rules only create rows for large week-over-week revenue drops, refund spikes, order drops, or negative QBO net income."}
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {insightsList.map((it) => (
+                  <div
+                    key={it._id != null ? String(it._id) : `${it.type}-${it.dateKey || ""}`}
+                    style={{
+                      border: "1px solid var(--line)",
+                      borderRadius: 14,
+                      padding: "12px 14px",
+                      background: "color-mix(in srgb, var(--bg-soft) 35%, transparent)",
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "space-between", alignItems: "baseline" }}>
+                      <div style={{ fontWeight: 750, color: "var(--ink)" }}>{it.title || it.type}</div>
+                      <div style={{ fontSize: 12, letterSpacing: "0.06em", fontWeight: 750, color: "var(--ink-3)" }}>
+                        {(it.provider || "").toUpperCase()} · {(it.severity || "info").toUpperCase()}
+                      </div>
+                    </div>
+                    {it.body ? (
+                      <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--ink-3)", lineHeight: 1.5 }}>
+                        {it.body}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
       </div>

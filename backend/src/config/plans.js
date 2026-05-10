@@ -29,7 +29,7 @@ const PLAN_CONFIG = {
     priceId: normalizeStripePriceId(process.env.STRIPE_PRO_PRICE_ID || ""),
     features: {
       premiumTools: true,
-      dataIntegrations: false,
+      dataIntegrations: true,
       prioritySupport: true,
     },
   },

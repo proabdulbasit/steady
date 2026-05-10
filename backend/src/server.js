@@ -9,12 +9,15 @@ dotenv.config({ path: path.resolve(__dirname, "..", "..", ".env.local") });
 const cors = require("cors");
 const express = require("express");
 const { connectToDatabase } = require("./lib/db");
+const { startIntegrationScheduler } = require("./integrations/scheduler");
 const billingRoutes = require("./routes/billing");
 const accessRoutes = require("./routes/access");
 const webhookRoutes = require("./routes/webhook");
 const authRoutes = require("./routes/auth");
 const profileRoutes = require("./routes/profile");
 const conversationRoutes = require("./routes/conversations");
+const integrationsRoutes = require("./routes/integrations");
+const insightsRoutes = require("./routes/insights");
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -35,6 +38,8 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/access", accessRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/integrations", integrationsRoutes);
+app.use("/api/insights", insightsRoutes);
 
 app.use((error, _req, res, _next) => {
   const status = error.status || 500;
@@ -48,6 +53,7 @@ connectToDatabase()
     app.listen(port, () => {
       console.log(`Steady backend listening on port ${port}`);
     });
+    startIntegrationScheduler();
   })
   .catch((error) => {
     console.error("Failed to connect to MongoDB", error);

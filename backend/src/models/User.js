@@ -15,6 +15,22 @@ const integrationsSchema = new mongoose.Schema(
     externalId: { type: String, default: "" },
     connectedAt: { type: Date, default: null },
     meta: { type: mongoose.Schema.Types.Mixed, default: {} },
+    oauth: {
+      accessToken: { type: String, default: "" },
+      refreshToken: { type: String, default: "" },
+      tokenType: { type: String, default: "" },
+      scopes: { type: [String], default: [] },
+      expiresAt: { type: Date, default: null },
+    },
+    // Provider-specific identifiers
+    merchantId: { type: String, default: "" }, // Square
+    realmId: { type: String, default: "" }, // QuickBooks
+    locationIds: { type: [String], default: [] }, // Square
+    sync: {
+      lastSyncedAt: { type: Date, default: null },
+      lastSyncStatus: { type: String, default: "" },
+      cursor: { type: String, default: "" },
+    },
   },
   { _id: false }
 );

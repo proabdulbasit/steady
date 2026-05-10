@@ -16,7 +16,7 @@ function normalizeUsage(user) {
 }
 
 function ensureBusinessIntegrationSlots(user) {
-  const providers = ["stripe", "quickbooks", "shopify", "slack"];
+  const providers = ["stripe", "square", "quickbooks", "shopify", "slack"];
   const existing = new Map((user.integrations || []).map((entry) => [entry.provider, entry]));
   user.integrations = providers.map((provider) => existing.get(provider) || { provider, status: "disconnected" });
 }
@@ -42,6 +42,41 @@ async function attachSessionToUser(user, sessionId) {
   return user;
 }
 
+function effectiveIntegrationStatus(entry) {
+  if (!entry) return "disconnected";
+  const access =
+    entry.oauth && typeof entry.oauth.accessToken === "string" ? entry.oauth.accessToken.trim() : "";
+  const refresh =
+    entry.oauth && typeof entry.oauth.refreshToken === "string" ? entry.oauth.refreshToken.trim() : "";
+  if (access || refresh) return "connected";
+
+  if (entry.provider === "square" || entry.provider === "quickbooks") {
+    return "disconnected";
+  }
+
+  if (entry.status === "connected") return "connected";
+  return entry.status || "disconnected";
+}
+
+function serializeIntegrationsForClient(user) {
+  const list = Array.isArray(user.integrations) ? user.integrations : [];
+  return list.map((entry) => ({
+    provider: entry.provider,
+    status: effectiveIntegrationStatus(entry),
+    externalId: entry.externalId || "",
+    connectedAt: entry.connectedAt || null,
+    merchantId: entry.merchantId || "",
+    realmId: entry.realmId || "",
+    locationIds: Array.isArray(entry.locationIds) ? entry.locationIds : [],
+    sync: {
+      lastSyncedAt: entry.sync?.lastSyncedAt || null,
+      lastSyncStatus: entry.sync?.lastSyncStatus || "",
+      cursor: entry.sync?.cursor || "",
+    },
+    meta: {},
+  }));
+}
+
 function serializeUser(user) {
   const plan = getPlanConfig(user.planId);
   normalizeUsage(user);
@@ -65,7 +100,7 @@ function serializeUser(user) {
         : Math.max(plan.dailyQuestionLimit - (user.usage?.questionsUsed || 0), 0),
     dailyQuestionLimit: plan.dailyQuestionLimit,
     features: plan.features,
-    integrations: user.integrations,
+    integrations: serializeIntegrationsForClient(user),
     hasActiveSubscription:
       plan.id !== PLAN_IDS.FREE && ["active", "trialing", "past_due"].includes(user.subscriptionStatus),
   };
@@ -156,11 +191,13 @@ async function authorizeQuestion(actor, options = {}) {
 module.exports = {
   attachSessionToUser,
   authorizeQuestion,
+  effectiveIntegrationStatus,
   ensureBusinessIntegrationSlots,
   findUserBySessionId,
   getUserByEmail,
   getUserById,
   normalizeUsage,
   resolveActor,
+  serializeIntegrationsForClient,
   serializeUser,
 };
