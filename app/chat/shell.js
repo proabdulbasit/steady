@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSteady } from "../../components/steady-provider";
-import { createConversation, listConversations } from "../../lib/chat-client";
+import { listConversations } from "../../lib/chat-client";
 import { ChatHistoryProvider } from "./chat-history-context";
 import ChatSidebar from "./sidebar";
 
@@ -11,6 +11,7 @@ export default function ChatShell({ children }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeId = searchParams?.get("c") || "";
+  const isNew = searchParams?.get("new") === "1";
   const { authToken, isAuthenticated } = useSteady();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -38,39 +39,27 @@ export default function ChatShell({ children }) {
 
   useEffect(() => {
     // If user visits /chat without selecting a conversation, open the most recent one by default.
+    // Skip this when the user explicitly opened a fresh chat (?new=1) — we want an empty state
+    // until they send the first message.
     if (activeId) return;
+    if (isNew) return;
     if (!conversations?.length) return;
     const first = conversations[0];
     if (!first?.id) return;
     router.replace(`/chat?c=${encodeURIComponent(first.id)}`);
-  }, [activeId, conversations, router]);
+  }, [activeId, conversations, isNew, router]);
 
   useEffect(() => {
     // Close the mobile drawer when navigation changes.
     setMobileSidebarOpen(false);
   }, [activeId]);
 
-  const createNewChat = useCallback(async () => {
-    // UX like ChatGPT: "New chat" opens an empty conversation.
-    // Prefer creating the conversation first so we can navigate to it and highlight it in the sidebar.
-    if (!isAuthenticated || !authToken) {
-      router.push("/chat");
-      return;
-    }
-
-    try {
-      const created = await createConversation(authToken, { title: "New chat" });
-      const id = created?.conversation?.id;
-      if (id) {
-        router.push(`/chat?c=${encodeURIComponent(id)}`);
-      } else {
-        router.push("/chat");
-      }
-      await refresh();
-    } catch {
-      router.push("/chat");
-    }
-  }, [authToken, isAuthenticated, refresh, router]);
+  const createNewChat = useCallback(() => {
+    // Don't create a backend conversation yet — the entry should only appear in the
+    // sidebar once the user actually sends a message. `page-client.js` handles lazy
+    // creation via ensureConversationId() on the first send.
+    router.push("/chat?new=1");
+  }, [router]);
 
   const value = useMemo(
     () => ({
