@@ -18,9 +18,14 @@ function safeTitleFromText(text = "") {
 function autoTitleFromFirstMessage(text = "") {
   const cleaned = String(text).replace(/\s+/g, " ").trim();
   if (!cleaned) return "New chat";
-  const words = cleaned.split(" ").filter(Boolean).slice(0, 3);
-  const title = words.join(" ");
-  return title || "New chat";
+  // Prefer the first sentence-ish segment, then cap at ~60 chars on a word boundary.
+  const firstChunk = cleaned.split(/[.!?\n]/, 1)[0].trim() || cleaned;
+  const MAX = 60;
+  if (firstChunk.length <= MAX) return firstChunk;
+  const slice = firstChunk.slice(0, MAX);
+  const lastSpace = slice.lastIndexOf(" ");
+  const safe = lastSpace > 20 ? slice.slice(0, lastSpace) : slice;
+  return `${safe.trim()}…`;
 }
 
 function serializeConversationSummary(convo) {
