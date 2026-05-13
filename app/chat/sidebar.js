@@ -246,7 +246,7 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
           Recent chats
         </div>
 
-        {loading ? (
+        {loading && !items.length ? (
           <div style={{ color: "var(--ink-3)", fontSize: "13px", padding: "8px 6px" }}>Loading…</div>
         ) : items.length ? (
           <div style={{ display: "grid", gap: "6px" }}>
@@ -279,19 +279,13 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
                       fontSize: "13px",
                       lineHeight: "1.25",
                       padding: "10px 36px 10px 10px",
-                      display: "grid",
-                      gap: "4px",
+                      display: "flex",
+                      gap: "8px",
+                      alignItems: "center",
                     }}
                   >
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                      {c.pinned ? <span title="Pinned" aria-hidden="true" style={{ color: "var(--gold)" }}>📌</span> : null}
-                      <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "New chat"}</div>
-                    </div>
-                    {c.lastMessagePreview ? (
-                      <div style={{ color: isActive ? "var(--gold)" : "var(--ink-3)", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {c.lastMessagePreview}
-                      </div>
-                    ) : null}
+                    {c.pinned ? <span title="Pinned" aria-hidden="true" style={{ color: "var(--gold)" }}>📌</span> : null}
+                    <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "New chat"}</div>
                   </button>
 
                   <button

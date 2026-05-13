@@ -20,6 +20,7 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   const [conversationId, setConversationId] = useState(initialConversationId);
   const [conversationTitle, setConversationTitle] = useState("");
   const [attachments, setAttachments] = useState([]);
+  const justCreatedIdRef = useRef("");
 
   const planId = profile?.planId || PLAN_IDS.FREE;
   const maxTokensByTier = planId === PLAN_IDS.BUSINESS ? 1200 : planId === PLAN_IDS.PRO ? 800 : 400;
@@ -51,7 +52,12 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
 
   useEffect(() => {
     // When the URL changes (e.g. clicking in sidebar / New chat), make sure our state matches it.
-    setConversationId(initialConversationId || "");
+    // Skip the reset when the URL change came from us creating a conversation locally — local
+    // state is already correct and resetting here would wipe the in-flight messages.
+    const target = initialConversationId || "";
+    if (target && target === justCreatedIdRef.current) return;
+    justCreatedIdRef.current = "";
+    setConversationId(target);
     setConversationTitle("");
     setMessages([]);
   }, [initialConversationId]);
@@ -61,6 +67,7 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
 
     async function loadConversation() {
       if (!authToken || !conversationId) return;
+      if (conversationId === justCreatedIdRef.current) return;
       try {
         const data = await fetchConversation(authToken, conversationId);
         if (cancelled) return;
@@ -106,6 +113,9 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
     const created = await createConversation(authToken, { firstMessage: firstUserMessage });
     const nextId = created?.conversation?.id || "";
     if (nextId) {
+      // Mark this id as locally created BEFORE the state/URL changes so the sync effects
+      // don't wipe our in-flight messages or refetch an empty conversation.
+      justCreatedIdRef.current = nextId;
       setConversationId(nextId);
       router.replace(`/chat?c=${encodeURIComponent(nextId)}`);
       refreshHistory().catch(() => null);
@@ -126,6 +136,7 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
       const created = await createConversation(authToken, { firstMessage: firstUserMessage });
       const nextId = created?.conversation?.id || "";
       if (nextId) {
+        justCreatedIdRef.current = nextId;
         setConversationId(nextId);
         router.replace(`/chat?c=${encodeURIComponent(nextId)}`);
         refreshHistory().catch(() => null);
@@ -174,7 +185,6 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "user", content: contentForHistory || "See attachments.", attachments: messageAttachments }]);
-          refreshHistory().catch(() => null);
         } catch {
           // Persistence is best-effort; don't fail the chat UX if history save fails.
         }
@@ -210,7 +220,6 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "assistant", content: assistantContent }]);
-          refreshHistory().catch(() => null);
         } catch {
           // ignore persistence errors
         }
@@ -229,7 +238,6 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "assistant", content: assistantContent }]);
-          refreshHistory().catch(() => null);
         } catch {
           // ignore persistence errors
         }
@@ -237,6 +245,15 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleComposerKeyDown(e) {
+    // Enter sends, Shift+Enter inserts a newline. Ignore IME composition events.
+    if (e.key !== "Enter" || e.shiftKey) return;
+    if (e.nativeEvent?.isComposing || e.isComposing) return;
+    e.preventDefault();
+    if ((!input.trim() && !attachments.length) || loading) return;
+    sendMessage();
   }
 
   return (
@@ -367,7 +384,15 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
                   >
                     +
                   </button>
-                  <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="What's going on with your business?" style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }} />
+                  <textarea
+                    autoFocus
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleComposerKeyDown}
+                    rows={1}
+                    placeholder="What's going on with your business?"
+                    style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }}
+                  />
                   <button
                     onClick={() => sendMessage()}
                     disabled={(!input.trim() && !attachments.length) || loading}
@@ -504,7 +529,14 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
               >
                 +
               </button>
-              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="What's going on with your business?" style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }} />
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                rows={1}
+                placeholder="What's going on with your business?"
+                style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }}
+              />
               <button
                 onClick={() => sendMessage()}
                 disabled={(!input.trim() && !attachments.length) || loading}
