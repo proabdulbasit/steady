@@ -30,7 +30,7 @@ router.get("/me", requireAuth, async (req, res) => {
 });
 
 router.patch("/me", requireAuth, async (req, res) => {
-  const { name = "", industry = "" } = req.body || {};
+  const { name = "", industry = "", briefingDelivery } = req.body || {};
   const user = await getUserById(req.auth.sub);
   if (!user) {
     return res.status(404).json({ error: "User not found." });
@@ -39,6 +39,15 @@ router.patch("/me", requireAuth, async (req, res) => {
   user.name = name.trim();
   if (industry && ALLOWED_INDUSTRIES.has(industry)) {
     user.industry = industry;
+  }
+  if (briefingDelivery && typeof briefingDelivery === "object") {
+    user.briefingDelivery = user.briefingDelivery || {};
+    if (typeof briefingDelivery.emailEnabled === "boolean") {
+      user.briefingDelivery.emailEnabled = briefingDelivery.emailEnabled;
+    }
+    if (typeof briefingDelivery.pushEnabled === "boolean") {
+      user.briefingDelivery.pushEnabled = briefingDelivery.pushEnabled;
+    }
   }
   await user.save();
 

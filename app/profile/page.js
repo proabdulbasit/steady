@@ -14,6 +14,11 @@ import {
   startIntegrationOAuth,
   syncIntegrationNow,
 } from "../../lib/integrations-client";
+import { fetchBriefingProcessingStatus } from "../../lib/briefing-client";
+import { BriefingProcessingPanel } from "../../components/briefing-processing-panel";
+import { BriefingSummaryPanel } from "../../components/briefing-summary-panel";
+import { BriefingInsightsPanel } from "../../components/briefing-insights-panel";
+import { BriefingDeliveryPanel } from "../../components/briefing-delivery-panel";
 
 function formatUsdFromCents(cents) {
   const n = Number(cents || 0) / 100;
@@ -55,6 +60,11 @@ export default function ProfilePage() {
   const [insightsLoadedAt, setInsightsLoadedAt] = useState(null);
   const [insightsLastCount, setInsightsLastCount] = useState(null);
   const [lastRecomputeResult, setLastRecomputeResult] = useState(null);
+  const [processingLoading, setProcessingLoading] = useState(false);
+  const [processingBusy, setProcessingBusy] = useState(false);
+  const [processingError, setProcessingError] = useState("");
+  const [processingStatus, setProcessingStatus] = useState(null);
+  const [lastManualRun, setLastManualRun] = useState(null);
   const isUnlimited = profile.questionsRemaining === null;
 
   useEffect(() => {
@@ -70,6 +80,31 @@ export default function ProfilePage() {
       router.push("/login");
     }
   }, [profileLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!authToken) return;
+    let cancelled = false;
+    (async () => {
+      setProcessingLoading(true);
+      setProcessingError("");
+      try {
+        const [statusData, integrationsData] = await Promise.all([
+          fetchBriefingProcessingStatus({ authToken }),
+          fetchIntegrationsStatus({ authToken }),
+        ]);
+        if (cancelled) return;
+        setProcessingStatus(statusData);
+        setIntegrationsStatus(integrationsData);
+      } catch (e) {
+        if (!cancelled) setProcessingError(e?.message || "Could not load processing status.");
+      } finally {
+        if (!cancelled) setProcessingLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken]);
 
   function openPasswordModal() {
     setPwdMsg("");
@@ -433,6 +468,29 @@ export default function ProfilePage() {
               })}
             </div>
           </section>
+
+          {/* Phase 5 — automated scheduled data processing */}
+          <BriefingProcessingPanel
+            authToken={authToken}
+            processingStatus={processingStatus}
+            setProcessingStatus={setProcessingStatus}
+            processingLoading={processingLoading}
+            setProcessingLoading={setProcessingLoading}
+            processingBusy={processingBusy}
+            setProcessingBusy={setProcessingBusy}
+            processingError={processingError}
+            setProcessingError={setProcessingError}
+            lastManualRun={lastManualRun}
+            setLastManualRun={setLastManualRun}
+            setIntegrationsStatus={setIntegrationsStatus}
+            errorStyle={errorStyle}
+          />
+
+          <BriefingSummaryPanel authToken={authToken} errorStyle={errorStyle} />
+
+          <BriefingInsightsPanel authToken={authToken} errorStyle={errorStyle} />
+
+          <BriefingDeliveryPanel authToken={authToken} errorStyle={errorStyle} successStyle={successStyle} />
 
           {/* Normalized metrics + canonical summary for AI */}
           <section className="profile-admin-panel surface-chrome card-section" style={{ gridColumn: "1 / -1" }}>

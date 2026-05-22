@@ -1,17 +1,14 @@
 const User = require("../models/User");
-const { syncSquareForUser } = require("./square");
-const { syncQboForUser } = require("./quickbooks");
-const { deriveInsightsForUser } = require("../lib/insights");
+const {
+  runDataProcessingForUser,
+  parseIntervalMinutes,
+  isSchedulerEnabled,
+  setLastSchedulerCycle,
+} = require("../lib/data-processing");
 const { quickbooksIntegrationReady, squareIntegrationReady } = require("../lib/integration-sync");
 
-function parseIntervalMinutes() {
-  const raw = Number(process.env.INTEGRATIONS_SYNC_INTERVAL_MINUTES || 30);
-  if (!Number.isFinite(raw) || raw <= 0) return 30;
-  return Math.min(Math.max(raw, 5), 24 * 60);
-}
-
-async function runOneCycle() {
-  const users = await User.find({
+async function findUsersWithIntegrations() {
+  return User.find({
     $or: [
       {
         integrations: {
@@ -39,41 +36,61 @@ async function runOneCycle() {
       },
     ],
   }).limit(50);
+}
 
-  for (const user of users) {
-    const list = user.integrations || [];
-    const square = list.find((x) => x.provider === "square" && squareIntegrationReady(x));
-    const qbo = list.find((x) => x.provider === "quickbooks" && quickbooksIntegrationReady(x));
+function userHasReadyIntegration(user) {
+  const list = user.integrations || [];
+  return list.some(
+    (x) =>
+      (x.provider === "square" && squareIntegrationReady(x)) ||
+      (x.provider === "quickbooks" && quickbooksIntegrationReady(x))
+  );
+}
 
-    if (square) {
+async function runOneCycle() {
+  const startedAt = new Date();
+  setLastSchedulerCycle({ startedAt, finishedAt: null, usersProcessed: 0, runsCreated: 0, error: "" });
+
+  try {
+    const users = await findUsersWithIntegrations();
+    let runsCreated = 0;
+    let usersProcessed = 0;
+
+    for (const user of users) {
+      if (!userHasReadyIntegration(user)) continue;
+      usersProcessed += 1;
       try {
-        await syncSquareForUser({ user, integration: square });
-        deriveInsightsForUser(user._id).catch(() => null);
+        await runDataProcessingForUser(user, { trigger: "scheduled" });
+        runsCreated += 1;
       } catch (e) {
-        square.sync = square.sync || {};
-        square.sync.lastSyncedAt = new Date();
-        square.sync.lastSyncStatus = `error: ${e?.message || "sync failed"}`;
-        await user.save();
+        console.error("[scheduler] user processing failed", user._id, e?.message || e);
       }
     }
-    if (qbo) {
-      try {
-        await syncQboForUser({ user, integration: qbo });
-        deriveInsightsForUser(user._id).catch(() => null);
-      } catch (e) {
-        qbo.sync = qbo.sync || {};
-        qbo.sync.lastSyncedAt = new Date();
-        qbo.sync.lastSyncStatus = `error: ${e?.message || "sync failed"}`;
-        await user.save();
-      }
-    }
+
+    setLastSchedulerCycle({
+      finishedAt: new Date(),
+      usersProcessed,
+      runsCreated,
+      error: "",
+    });
+  } catch (e) {
+    setLastSchedulerCycle({
+      finishedAt: new Date(),
+      error: e?.message || "cycle failed",
+    });
+    throw e;
   }
 }
 
 function startIntegrationScheduler() {
-  if (process.env.INTEGRATIONS_SYNC_ENABLED !== "true") return null;
+  if (!isSchedulerEnabled()) {
+    console.log("[scheduler] INTEGRATIONS_SYNC_ENABLED is not true — background sync disabled.");
+    return null;
+  }
+
   const intervalMin = parseIntervalMinutes();
   const intervalMs = intervalMin * 60 * 1000;
+  console.log(`[scheduler] Automated data processing every ${intervalMin} minute(s).`);
 
   let running = false;
   async function tick() {
@@ -81,6 +98,8 @@ function startIntegrationScheduler() {
     running = true;
     try {
       await runOneCycle();
+    } catch (e) {
+      console.error("[scheduler] cycle error", e?.message || e);
     } finally {
       running = false;
     }
@@ -91,4 +110,4 @@ function startIntegrationScheduler() {
   return () => clearInterval(id);
 }
 
-module.exports = { startIntegrationScheduler };
+module.exports = { startIntegrationScheduler, runOneCycle };

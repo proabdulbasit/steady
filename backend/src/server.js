@@ -10,6 +10,7 @@ const cors = require("cors");
 const express = require("express");
 const { connectToDatabase } = require("./lib/db");
 const { startIntegrationScheduler } = require("./integrations/scheduler");
+const { startBriefingDeliveryScheduler } = require("./integrations/briefing-delivery-scheduler");
 const billingRoutes = require("./routes/billing");
 const accessRoutes = require("./routes/access");
 const webhookRoutes = require("./routes/webhook");
@@ -18,6 +19,7 @@ const profileRoutes = require("./routes/profile");
 const conversationRoutes = require("./routes/conversations");
 const integrationsRoutes = require("./routes/integrations");
 const insightsRoutes = require("./routes/insights");
+const briefingRoutes = require("./routes/briefing");
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -40,6 +42,7 @@ app.use("/api/access", accessRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/integrations", integrationsRoutes);
 app.use("/api/insights", insightsRoutes);
+app.use("/api/briefing", briefingRoutes);
 
 app.use((error, _req, res, _next) => {
   const status = error.status || 500;
@@ -54,6 +57,7 @@ connectToDatabase()
       console.log(`Steady backend listening on port ${port}`);
     });
     startIntegrationScheduler();
+    startBriefingDeliveryScheduler();
   })
   .catch((error) => {
     console.error("Failed to connect to MongoDB", error);

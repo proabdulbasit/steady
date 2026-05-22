@@ -103,6 +103,13 @@ function serializeUser(user) {
     integrations: serializeIntegrationsForClient(user),
     hasActiveSubscription:
       plan.id !== PLAN_IDS.FREE && ["active", "trialing", "past_due"].includes(user.subscriptionStatus),
+    briefingDelivery: {
+      emailEnabled: user.briefingDelivery?.emailEnabled !== false,
+      pushEnabled: user.briefingDelivery?.pushEnabled !== false,
+      lastDeliveredAt: user.briefingDelivery?.lastDeliveredAt || null,
+      lastDeliveryDateKey: user.briefingDelivery?.lastDeliveryDateKey || "",
+    },
+    pushSubscriptionCount: Array.isArray(user.pushSubscriptions) ? user.pushSubscriptions.length : 0,
   };
 }
 

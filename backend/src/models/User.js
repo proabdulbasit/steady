@@ -71,6 +71,26 @@ const userSchema = new mongoose.Schema(
     lastCheckoutSessionId: { type: String, default: "" },
     passwordResetTokenHash: { type: String, default: "" },
     passwordResetExpires: { type: Date, default: null },
+    briefingDelivery: {
+      emailEnabled: { type: Boolean, default: true },
+      pushEnabled: { type: Boolean, default: true },
+      lastDeliveredAt: { type: Date, default: null },
+      lastDeliveryDateKey: { type: String, default: "" },
+    },
+    pushSubscriptions: {
+      type: [
+        {
+          endpoint: { type: String, required: true },
+          keys: {
+            p256dh: { type: String, default: "" },
+            auth: { type: String, default: "" },
+          },
+          userAgent: { type: String, default: "" },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );
