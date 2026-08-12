@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const { requireAuth } = require("../middleware/auth");
 const Conversation = require("../models/Conversation");
+const { scheduleOutcomeCheck } = require("../lib/outcome-checks");
 
 const router = express.Router();
 
@@ -185,6 +186,30 @@ router.post("/:id/messages", requireAuth, async (req, res) => {
 
   convo.messages.push(...messages);
   await convo.save();
+
+  // Outcome Memory Loop — schedule 7-day follow-up after actionable assistant advice.
+  try {
+    const assistantMsgs = messages.filter((m) => m.role === "assistant");
+    if (assistantMsgs.length) {
+      const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
+      let userPrompt = "";
+      for (let i = convo.messages.length - 1; i >= 0; i -= 1) {
+        if (convo.messages[i].role === "user") {
+          userPrompt = convo.messages[i].content || "";
+          break;
+        }
+      }
+      await scheduleOutcomeCheck({
+        userId,
+        source: "chat",
+        conversationId: convo._id,
+        advice: lastAssistant.content,
+        userPrompt,
+      });
+    }
+  } catch (err) {
+    console.warn("[outcomes] schedule after chat failed:", err?.message || err);
+  }
 
   return res.json({ conversation: serializeConversationFull(convo) });
 });

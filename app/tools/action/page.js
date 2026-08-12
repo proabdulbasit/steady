@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { GoldButton, PageShell, formatMessage } from "../../../components/steady-ui";
+import { ExplainToMyTeam } from "../../../components/explain-to-my-team";
 import { useSteady } from "../../../components/steady-provider";
+import { scheduleOutcome } from "../../../lib/outcomes-client";
 
 const ACTION_SYSTEM = `You are Steady. Create a detailed, step-by-step action plan for a small business owner. Be specific. Use numbered steps. Include timelines, costs if relevant, and exact scripts or language they can use. End with "Next move:" — the single first step.`;
 
 export default function ActionPage() {
-  const { isPremium, runAssistantRequest } = useSteady();
+  const { isPremium, runAssistantRequest, authToken } = useSteady();
   const [topic, setTopic] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,14 @@ export default function ActionPage() {
         system: ACTION_SYSTEM,
         prompt: `Create a complete action plan for: ${topic}`,
       });
-      setResult(data.content?.[0]?.text || "Unable to generate action plan.");
+      const text = data.content?.[0]?.text || "Unable to generate action plan.";
+      setResult(text);
+      scheduleOutcome({
+        authToken,
+        advice: text,
+        userPrompt: topic,
+        source: "tool_action",
+      }).catch(() => null);
     } catch (error) {
       setResult(error.message || "Unable to generate action plan.");
     } finally {
@@ -37,7 +46,12 @@ export default function ActionPage() {
       <div style={{ marginTop: "12px" }}>
         <GoldButton onClick={handleRun} disabled={loading || !topic.trim()}>{loading ? "Building..." : "Build Plan"}</GoldButton>
       </div>
-      {result && <div style={{ marginTop: "18px", background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "16px", padding: "20px", color: "var(--ink-2)" }}>{formatMessage(result)}</div>}
+      {result && (
+        <div style={{ marginTop: "18px", background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "16px", padding: "20px", color: "var(--ink-2)" }}>
+          {formatMessage(result)}
+          {isPremium ? <ExplainToMyTeam advice={result} /> : null}
+        </div>
+      )}
     </PageShell>
   );
 }

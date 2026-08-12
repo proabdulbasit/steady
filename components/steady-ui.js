@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSteady } from "./steady-provider";
 import { useTheme } from "./theme-provider";
+import { OutcomeCheckupBanner } from "./outcome-checkup-banner";
+import { DailyPulseBanner } from "./daily-pulse-banner";
 
 /* =========================================================
    Public constants — kept for backward compatibility
@@ -165,19 +167,29 @@ export function AppChrome({ children }) {
     if (!pathname?.startsWith("/chat")) {
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
+      document.documentElement.style.removeProperty("--app-header-h");
       return;
     }
 
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
 
-    // Keep CSS var in sync with actual header height (responsive).
-    const header = document.querySelector(".app-header");
-    if (header && header instanceof HTMLElement) {
-      document.documentElement.style.setProperty("--app-header-h", `${header.offsetHeight}px`);
-    }
+    // Measure sticky top chrome (nav + pulse + outcome banners), not just .app-header.
+    const chrome = document.querySelector(".app-top-chrome");
+    if (!(chrome instanceof HTMLElement)) return undefined;
+
+    const syncHeight = () => {
+      document.documentElement.style.setProperty("--app-header-h", `${chrome.offsetHeight}px`);
+    };
+    syncHeight();
+
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncHeight) : null;
+    ro?.observe(chrome);
+    window.addEventListener("resize", syncHeight);
 
     return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", syncHeight);
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
     };
@@ -187,7 +199,7 @@ export function AppChrome({ children }) {
     { href: "/", label: "Home" },
     { href: "/pricing", label: "Pricing" },
     ...(isAuthenticated
-      ? [{ href: "/profile", label: "Profile" }]
+      ? [{ href: "/tools/document-upload", label: "Upload" }, { href: "/profile", label: "Profile" }]
       : [{ href: "/login", label: "Login" }, { href: "/register", label: "Register" }]),
     ...(profile?.role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),
   ];
@@ -196,6 +208,7 @@ export function AppChrome({ children }) {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div className="app-top-chrome">
       <header className="app-header">
         <div className="container" style={{ padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -264,6 +277,10 @@ export function AppChrome({ children }) {
         )}
       </header>
 
+      <DailyPulseBanner />
+      <OutcomeCheckupBanner />
+      </div>
+
       <div style={{ flex: 1, minHeight: 0, overflow: isChat ? "hidden" : "visible" }}>
         {children}
       </div>
@@ -280,7 +297,7 @@ export function AppChrome({ children }) {
                 Direct, plain-spoken answers for the people running real businesses. Built to be useful in two minutes.
               </p>
             </div>
-            <FooterCol title="Product" links={[["/", "Home"], ["/pricing", "Pricing"], ["/chat", "Chat"]]} />
+            <FooterCol title="Product" links={[["/", "Home"], ["/pricing", "Pricing"], ["/chat", "Chat"], ["/tools/document-upload", "CSV & Photo Upload"]]} />
             <FooterCol title="Account" links={[["/login", "Sign in"], ["/register", "Register"], ["/profile", "Profile"]]} />
             <FooterCol title="Legal" links={[["/privacy", "Privacy"], ["/terms", "Terms"]]} />
           </div>
@@ -311,6 +328,29 @@ function FooterCol({ title, links }) {
    Markdown-ish formatter (kept compatible)
    ========================================================= */
 
+/** Render inline **bold** (and nested plain text) without showing asterisks. */
+export function formatInline(text) {
+  const raw = String(text ?? "");
+  const parts = [];
+  const re = /\*\*(.+?)\*\*/g;
+  let last = 0;
+  let match;
+  let key = 0;
+  while ((match = re.exec(raw)) !== null) {
+    if (match.index > last) {
+      parts.push(raw.slice(last, match.index));
+    }
+    parts.push(
+      <strong key={`b-${key++}`} style={{ fontWeight: 700, color: "var(--ink)" }}>
+        {match[1]}
+      </strong>
+    );
+    last = match.index + match[0].length;
+  }
+  if (last < raw.length) parts.push(raw.slice(last));
+  return parts.length ? parts : raw;
+}
+
 export function formatMessage(text) {
   const lines = text.split("\n").filter((line) => line.trim());
   return lines.map((line, index) => {
@@ -318,21 +358,21 @@ export function formatMessage(text) {
       return (
         <div key={index} style={{ marginTop: 18, padding: "16px 18px", background: "var(--gold-soft)", borderLeft: "3px solid var(--gold)", borderRadius: "0 12px 12px 0" }}>
           <span style={{ display: "block", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 700, marginBottom: 6 }}>Next move</span>
-          <span style={{ fontSize: 16, color: "var(--ink)", lineHeight: 1.55 }}>{line.replace(/next move:/i, "").trim()}</span>
+          <span style={{ fontSize: 16, color: "var(--ink)", lineHeight: 1.55 }}>{formatInline(line.replace(/next move:/i, "").trim())}</span>
         </div>
       );
     }
     if (line.match(/^[A-Z][A-Z\s]+:/) && line.length < 60) {
-      return <div key={index} style={{ marginTop: 20, marginBottom: 6, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 700 }}>{line}</div>;
+      return <div key={index} style={{ marginTop: 20, marginBottom: 6, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 700 }}>{formatInline(line)}</div>;
     }
     if (line.match(/^\d+\./)) {
       return (
         <div key={index} style={{ display: "flex", gap: 10, margin: "8px 0", paddingLeft: 4 }}>
           <span style={{ color: "var(--gold)", fontWeight: 700, minWidth: 22 }}>{line.match(/^\d+/)[0]}.</span>
-          <span style={{ color: "var(--ink-2)", lineHeight: 1.65, fontSize: 15 }}>{line.replace(/^\d+\./, "").trim()}</span>
+          <span style={{ color: "var(--ink-2)", lineHeight: 1.65, fontSize: 15 }}>{formatInline(line.replace(/^\d+\./, "").trim())}</span>
         </div>
       );
     }
-    return <p key={index} style={{ margin: "0 0 12px 0", lineHeight: 1.75, fontSize: 15, color: "var(--ink-2)" }}>{line.replace(/^-/, "").trim()}</p>;
+    return <p key={index} style={{ margin: "0 0 12px 0", lineHeight: 1.75, fontSize: 15, color: "var(--ink-2)" }}>{formatInline(line.replace(/^-/, "").trim())}</p>;
   });
 }

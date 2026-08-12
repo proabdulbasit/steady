@@ -262,14 +262,20 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
                     background: isActive ? "var(--gold-soft)" : "transparent",
                     color: isActive ? "var(--gold)" : "var(--ink-2)",
                     borderRadius: "12px",
-                    overflow: "visible",
+                    overflow: "hidden",
+                    minWidth: 0,
+                    maxWidth: "100%",
                   }}
                 >
                   <button
                     onClick={() => router.push(`/chat?c=${encodeURIComponent(c.id)}`)}
                     className="steady-chat-item"
+                    title={c.title || "New chat"}
                     style={{
                       width: "100%",
+                      maxWidth: "100%",
+                      minWidth: 0,
+                      boxSizing: "border-box",
                       textAlign: "left",
                       background: "transparent",
                       border: "none",
@@ -282,10 +288,30 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
                       display: "flex",
                       gap: "8px",
                       alignItems: "center",
+                      overflow: "hidden",
                     }}
                   >
-                    {c.pinned ? <span title="Pinned" aria-hidden="true" style={{ color: "var(--gold)" }}>📌</span> : null}
-                    <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "New chat"}</div>
+                    {c.pinned ? (
+                      <span
+                        title="Pinned"
+                        aria-hidden="true"
+                        style={{ color: "var(--gold)", flexShrink: 0, lineHeight: 1 }}
+                      >
+                        📌
+                      </span>
+                    ) : null}
+                    <span
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontWeight: 600,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {c.title || "New chat"}
+                    </span>
                   </button>
 
                   <button
@@ -312,8 +338,9 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
                     }}
                     style={{
                       position: "absolute",
-                      top: "8px",
+                      top: "50%",
                       right: "8px",
+                      transform: "translateY(-50%)",
                       width: "28px",
                       height: "28px",
                       borderRadius: "10px",
@@ -321,17 +348,29 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
                       background: isActive ? "var(--gold-soft)" : "color-mix(in srgb, var(--bg-soft) 55%, transparent)",
                       color: isActive ? "var(--gold)" : "var(--ink-2)",
                       cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      display: "grid",
+                      placeItems: "center",
                       opacity: menuForId === c.id ? 1 : 0,
                       pointerEvents: menuForId === c.id ? "auto" : "none",
                       transition: "opacity 120ms ease",
                       padding: 0,
+                      lineHeight: 1,
                     }}
                   >
-                    <span aria-hidden="true" style={{ display: "block", lineHeight: 1, fontSize: 18, transform: "translateY(-1px)" }}>
-                      ⋯
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: "block",
+                        width: 14,
+                        height: 14,
+                        lineHeight: 0,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                        <circle cx="2.5" cy="7" r="1.4" />
+                        <circle cx="7" cy="7" r="1.4" />
+                        <circle cx="11.5" cy="7" r="1.4" />
+                      </svg>
                     </span>
                   </button>
                 </div>

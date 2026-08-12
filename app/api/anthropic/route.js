@@ -71,6 +71,38 @@ async function authorizeAccess(sessionId, authToken = "", consume = false) {
   };
 }
 
+/** Pull past Worked / Partially / Didn't Try outcomes to personalize advice. */
+async function fetchOutcomeMemoryBlock(authToken = "") {
+  if (!BACKEND_URL || !authToken) return "";
+  try {
+    const response = await fetch(`${BACKEND_URL.replace(/\/$/, "")}/api/outcomes/memory`, {
+      headers: { authorization: `Bearer ${authToken}` },
+      cache: "no-store",
+    });
+    if (!response.ok) return "";
+    const data = await response.json().catch(() => ({}));
+    return typeof data?.memoryBlock === "string" ? data.memoryBlock.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Daily Busy/Normal/Slow taps for timing-aware advice. */
+async function fetchPulseMemoryBlock(authToken = "") {
+  if (!BACKEND_URL || !authToken) return "";
+  try {
+    const response = await fetch(`${BACKEND_URL.replace(/\/$/, "")}/api/daily-pulse/memory`, {
+      headers: { authorization: `Bearer ${authToken}` },
+      cache: "no-store",
+    });
+    if (!response.ok) return "";
+    const data = await response.json().catch(() => ({}));
+    return typeof data?.memoryBlock === "string" ? data.memoryBlock.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
 export async function POST(req) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -114,9 +146,12 @@ export async function POST(req) {
   const industry = access.data?.user?.industry || "restaurant";
   const industrySystem = getPrompt(industry);
   const extraSystem = typeof body.system === "string" ? body.system : "";
+  const outcomeMemory = await fetchOutcomeMemoryBlock(authToken);
+  const pulseMemory = await fetchPulseMemoryBlock(authToken);
+  const systemParts = [industrySystem, outcomeMemory, pulseMemory, extraSystem].filter(Boolean);
   const payload = {
     ...body,
-    system: extraSystem ? `${industrySystem}\n\n${extraSystem}` : industrySystem,
+    system: systemParts.join("\n\n"),
     model: requestedModel || DEFAULT_MODEL,
   };
 

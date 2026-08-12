@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BUSINESS_SYSTEM, FREE_SYSTEM, PREMIUM_SYSTEM, formatMessage } from "../../components/steady-ui";
+import { ExplainToMyTeam } from "../../components/explain-to-my-team";
+import { ChatVoiceButton } from "../../components/chat-voice-button";
+import { ChatVoiceMode, ChatVoiceModeLaunchButton } from "../../components/chat-voice-mode";
 import { useSteady } from "../../components/steady-provider";
 import { useRouter } from "next/navigation";
 import { appendConversationMessages, createConversation, fetchConversation } from "../../lib/chat-client";
@@ -20,7 +23,21 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   const [conversationId, setConversationId] = useState(initialConversationId);
   const [conversationTitle, setConversationTitle] = useState("");
   const [attachments, setAttachments] = useState([]);
+  const [voiceError, setVoiceError] = useState("");
+  const [voiceModeOpen, setVoiceModeOpen] = useState(false);
   const justCreatedIdRef = useRef("");
+  const autoSentPromptRef = useRef("");
+  const voiceSendingRef = useRef(false);
+  const messagesRef = useRef(messages);
+  const conversationIdRef = useRef(conversationId);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   const planId = profile?.planId || PLAN_IDS.FREE;
   const maxTokensByTier = planId === PLAN_IDS.BUSINESS ? 1200 : planId === PLAN_IDS.PRO ? 800 : 400;
@@ -99,13 +116,14 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   }, [authToken, conversationId]);
 
   useEffect(() => {
-    // If we arrived with an initial prompt and no conversation selected,
-    // automatically start the conversation by sending that prompt once.
-    if (!initialPrompt || conversationId) return;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Arriving with ?prompt= (e.g. Outcome "Partially") — auto-send once per prompt.
+    if (!initialPrompt || !isAuthenticated || profileLoading) return;
+    if (autoSentPromptRef.current === initialPrompt) return;
+    if (conversationId) return;
+    autoSentPromptRef.current = initialPrompt;
     sendMessage(initialPrompt).catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialPrompt, isAuthenticated, profileLoading, conversationId]);
 
   async function ensureConversationId(firstUserMessage) {
     if (conversationId) return conversationId;
@@ -256,6 +274,91 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
     sendMessage();
   }
 
+  function handleVoiceInterim(text) {
+    setVoiceError("");
+    setInput(text);
+  }
+
+  function handleVoiceFinal(text) {
+    const trimmed = String(text || "").trim();
+    if (!trimmed || loading || voiceSendingRef.current) return;
+    voiceSendingRef.current = true;
+    setVoiceError("");
+    setInput(trimmed);
+    Promise.resolve(sendMessage(trimmed))
+      .catch(() => null)
+      .finally(() => {
+        voiceSendingRef.current = false;
+      });
+  }
+
+  /** Voice Mode turn: listen → Steady answer → speak out loud (and keep chat history). */
+  async function runVoiceModeTurn(userText) {
+    const contentForHistory = String(userText || "").trim();
+    if (!contentForHistory) throw new Error("Say something first.");
+
+    const prior = messagesRef.current || [];
+    const nextMessages = [...prior, { role: "user", content: contentForHistory, attachments: [] }];
+    setMessages([...nextMessages, { role: "assistant", content: "" }]);
+    setLoading(true);
+
+    let convoId = conversationIdRef.current;
+    const voiceSystem = `${systemByTier}
+
+VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possible. Plain English. Still end with "Next move:" as one clear action.`;
+
+    try {
+      convoId = await ensureValidConversationId(convoId, contentForHistory);
+      if (authToken && convoId) {
+        try {
+          await appendConversationMessages(authToken, convoId, [
+            { role: "user", content: contentForHistory, attachments: [] },
+          ]);
+        } catch {
+          // best-effort
+        }
+      }
+
+      const data = await runAssistantRequest({
+        system: voiceSystem,
+        messages: toAnthropicMessages(nextMessages),
+        maxTokens: Math.min(maxTokensByTier, 700),
+      });
+      const assistantContent = data.content?.[0]?.text || "I couldn’t answer that clearly. Try again.";
+      setMessages((current) => {
+        const copy = Array.isArray(current) ? [...current] : [];
+        if (copy.length && copy[copy.length - 1]?.role === "assistant") {
+          copy[copy.length - 1] = { role: "assistant", content: assistantContent, attachments: [] };
+          return copy;
+        }
+        return [...nextMessages, { role: "assistant", content: assistantContent, attachments: [] }];
+      });
+      if (authToken && convoId) {
+        try {
+          await appendConversationMessages(authToken, convoId, [
+            { role: "assistant", content: assistantContent },
+          ]);
+        } catch {
+          // ignore
+        }
+      }
+      return assistantContent;
+    } catch (error) {
+      const assistantContent = error.message || "Request failed.";
+      setMessages((current) => {
+        const copy = Array.isArray(current) ? [...current] : [];
+        if (copy.length && copy[copy.length - 1]?.role === "assistant") {
+          copy[copy.length - 1] = { role: "assistant", content: assistantContent, attachments: [] };
+          return copy;
+        }
+        return [...nextMessages, { role: "assistant", content: assistantContent, attachments: [] }];
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="chat-page">
       <div className="chat-page-head">
@@ -309,7 +412,12 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
                       {msg.content ? <div>{msg.content}</div> : null}
                     </div>
                   ) : (
-                    formatMessage(msg.content)
+                    <div>
+                      {formatMessage(msg.content)}
+                      {msg.content?.trim() && !(loading && i === messages.length - 1) ? (
+                        <ExplainToMyTeam advice={msg.content} compact />
+                      ) : null}
+                    </div>
                   )}
                 </div>
               </div>
@@ -387,11 +495,27 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
                   <textarea
                     autoFocus
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => {
+                      setVoiceError("");
+                      setInput(e.target.value);
+                    }}
                     onKeyDown={handleComposerKeyDown}
                     rows={1}
                     placeholder="What's going on with your business?"
                     style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }}
+                  />
+                  <ChatVoiceButton
+                    disabled={loading || voiceModeOpen}
+                    onInterim={handleVoiceInterim}
+                    onFinal={handleVoiceFinal}
+                    onError={(msg) => setVoiceError(msg || "")}
+                  />
+                  <ChatVoiceModeLaunchButton
+                    disabled={loading}
+                    onClick={() => {
+                      setVoiceError("");
+                      setVoiceModeOpen(true);
+                    }}
                   />
                   <button
                     onClick={() => sendMessage()}
@@ -415,6 +539,9 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
                     ↑
                   </button>
                 </div>
+                {voiceError ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "var(--danger)", textAlign: "center" }}>{voiceError}</div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -531,11 +658,27 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
               </button>
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setVoiceError("");
+                  setInput(e.target.value);
+                }}
                 onKeyDown={handleComposerKeyDown}
                 rows={1}
                 placeholder="What's going on with your business?"
                 style={{ flex: 1, background: "transparent", border: "none", padding: "10px 0", color: "var(--ink)", fontFamily: "inherit", fontSize: "16px", resize: "none", minHeight: "24px", maxHeight: "120px" }}
+              />
+              <ChatVoiceButton
+                disabled={loading || voiceModeOpen}
+                onInterim={handleVoiceInterim}
+                onFinal={handleVoiceFinal}
+                onError={(msg) => setVoiceError(msg || "")}
+              />
+              <ChatVoiceModeLaunchButton
+                disabled={loading}
+                onClick={() => {
+                  setVoiceError("");
+                  setVoiceModeOpen(true);
+                }}
               />
               <button
                 onClick={() => sendMessage()}
@@ -559,9 +702,20 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
                 ↑
               </button>
             </div>
+            {voiceError ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--danger)", textAlign: "center" }}>{voiceError}</div>
+            ) : null}
           </div>
         </>
       ) : null}
+
+      <ChatVoiceMode
+        open={voiceModeOpen}
+        disabled={loading}
+        runTurn={runVoiceModeTurn}
+        onClose={() => setVoiceModeOpen(false)}
+        onSwitchToType={() => setVoiceModeOpen(false)}
+      />
 
       <style>{`
         @media (max-width: 768px) {

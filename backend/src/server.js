@@ -20,6 +20,10 @@ const conversationRoutes = require("./routes/conversations");
 const integrationsRoutes = require("./routes/integrations");
 const insightsRoutes = require("./routes/insights");
 const briefingRoutes = require("./routes/briefing");
+const documentUploadRoutes = require("./routes/document-upload");
+const explainToTeamRoutes = require("./routes/explain-to-team");
+const outcomesRoutes = require("./routes/outcomes");
+const dailyPulseRoutes = require("./routes/daily-pulse");
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -43,6 +47,10 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/integrations", integrationsRoutes);
 app.use("/api/insights", insightsRoutes);
 app.use("/api/briefing", briefingRoutes);
+app.use("/api/document-upload", documentUploadRoutes);
+app.use("/api/explain-to-team", explainToTeamRoutes);
+app.use("/api/outcomes", outcomesRoutes);
+app.use("/api/daily-pulse", dailyPulseRoutes);
 
 app.use((error, _req, res, _next) => {
   const status = error.status || 500;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GoldButton, GhostButton, PageShell } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
@@ -309,6 +310,28 @@ export default function ProfilePage() {
             <GoldButton type="button" onClick={() => router.push("/pricing")} style={{ width: "100%", marginTop: 8 }}>
               Manage plan
             </GoldButton>
+          </section>
+
+          {/* CSV & Photo Upload — works without Square / QuickBooks */}
+          <section
+            className="profile-admin-panel surface-chrome card-section"
+            style={{ gridColumn: "1 / -1", background: "var(--gold-soft)", borderColor: "var(--gold-ring)" }}
+          >
+            <div className="profile-admin-panel-head" style={{ marginBottom: 0, alignItems: "center" }}>
+              <div>
+                <div className="profile-admin-panel-kicker">No integration required</div>
+                <h2 className="profile-admin-panel-title serif" style={{ marginBottom: 6 }}>
+                  CSV &amp; Photo Upload
+                </h2>
+                <p className="profile-admin-panel-meta" style={{ maxWidth: "72ch", margin: 0 }}>
+                  Photograph or upload a sales report, invoice, or expense sheet. Steady analyzes the actual data —
+                  useful while Square / QuickBooks approval is pending.
+                </p>
+              </div>
+              <Link href="/tools/document-upload" className="btn btn-primary btn-sm">
+                Upload document
+              </Link>
+            </div>
           </section>
 
           {/* Integrations */}
