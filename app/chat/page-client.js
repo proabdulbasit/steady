@@ -6,21 +6,60 @@ import { ExplainToMyTeam } from "../../components/explain-to-my-team";
 import { ChatVoiceButton } from "../../components/chat-voice-button";
 import { ChatVoiceMode, ChatVoiceModeLaunchButton } from "../../components/chat-voice-mode";
 import { useSteady } from "../../components/steady-provider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { appendConversationMessages, createConversation, fetchConversation } from "../../lib/chat-client";
 import { useChatHistory } from "./chat-history-context";
 import { PLAN_IDS } from "../../lib/plans";
+import { canAccessApp } from "../../lib/auth-redirect";
 
-export default function ChatClientPage({ initialPrompt = "", initialConversationId = "" }) {
+/**
+ * Survives ChatClientPage remounts when the URL flips from ?prompt= to ?c=id mid-stream.
+ * The async send keeps writing here; a newly mounted instance subscribes and paints it.
+ */
+const inflight = {
+  conversationId: "",
+  prompt: "",
+  messages: [],
+  loading: false,
+  generation: 0,
+};
+const inflightSubs = new Set();
+
+function publishInflight() {
+  const snap = {
+    conversationId: inflight.conversationId,
+    prompt: inflight.prompt,
+    messages: inflight.messages,
+    loading: inflight.loading,
+    generation: inflight.generation,
+  };
+  inflightSubs.forEach((fn) => fn(snap));
+}
+
+function writeInflight(patch) {
+  Object.assign(inflight, patch);
+  publishInflight();
+}
+
+function inflightMatches(conversationId, prompt) {
+  if (inflight.conversationId && conversationId && inflight.conversationId === conversationId) return true;
+  if (inflight.loading && inflight.prompt && prompt && inflight.prompt === prompt) return true;
+  return false;
+}
+
+export default function ChatClientPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const promptParam = searchParams?.get("prompt") || "";
+  const conversationIdParam = searchParams?.get("c") || "";
   const { isPremium, remainingQuestions, runAssistantRequest, runAssistantRequestStream, isAuthenticated, profile, profileLoading, authToken } = useSteady();
   const { refresh: refreshHistory } = useChatHistory();
-  const [input, setInput] = useState(initialPrompt);
+  const [input, setInput] = useState(promptParam);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
-  const [conversationId, setConversationId] = useState(initialConversationId);
+  const [conversationId, setConversationId] = useState(conversationIdParam);
   const [conversationTitle, setConversationTitle] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [voiceError, setVoiceError] = useState("");
@@ -28,8 +67,12 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   const justCreatedIdRef = useRef("");
   const autoSentPromptRef = useRef("");
   const voiceSendingRef = useRef(false);
+  const sendGenRef = useRef(0);
   const messagesRef = useRef(messages);
   const conversationIdRef = useRef(conversationId);
+  const promptParamRef = useRef(promptParam);
+  const loadingRef = useRef(loading);
+  const authTokenRef = useRef(authToken);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -38,6 +81,26 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   useEffect(() => {
     conversationIdRef.current = conversationId;
   }, [conversationId]);
+
+  useEffect(() => {
+    promptParamRef.current = promptParam;
+  }, [promptParam]);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  useEffect(() => {
+    if (authTokenRef.current === authToken) return;
+    authTokenRef.current = authToken;
+    writeInflight({
+      conversationId: "",
+      prompt: "",
+      messages: [],
+      loading: false,
+      generation: inflight.generation + 1,
+    });
+  }, [authToken]);
 
   const planId = profile?.planId || PLAN_IDS.FREE;
   const maxTokensByTier = planId === PLAN_IDS.BUSINESS ? 1200 : planId === PLAN_IDS.PRO ? 800 : 400;
@@ -50,10 +113,10 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
       router.replace("/login");
       return;
     }
-    if (profile?.planSelected === false) {
+    if (!canAccessApp(profile)) {
       router.replace("/pricing");
     }
-  }, [isAuthenticated, profile?.planSelected, profileLoading, router]);
+  }, [isAuthenticated, profile, profileLoading, router]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,16 +131,57 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   }, [attachments]);
 
   useEffect(() => {
+    const apply = (snap) => {
+      // Only paint live streams. Completed leftover snapshots must not replace a
+      // full conversation when switching chats or starting voice/new chat.
+      if (!snap?.loading) return;
+      const cid = conversationIdRef.current;
+      const prompt = promptParamRef.current;
+      const matchById =
+        snap.conversationId &&
+        (snap.conversationId === cid || snap.conversationId === justCreatedIdRef.current);
+      const matchByPrompt = snap.prompt && prompt && snap.prompt === prompt;
+      if (!matchById && !matchByPrompt) return;
+      if (snap.conversationId && (!cid || snap.conversationId === justCreatedIdRef.current) && snap.conversationId !== cid) {
+        justCreatedIdRef.current = snap.conversationId;
+        setConversationId(snap.conversationId);
+      }
+      setMessages(snap.messages);
+      setLoading(true);
+    };
+    apply(inflight);
+    inflightSubs.add(apply);
+    return () => inflightSubs.delete(apply);
+  }, []);
+
+  useEffect(() => {
     // When the URL changes (e.g. clicking in sidebar / New chat), make sure our state matches it.
     // Skip the reset when the URL change came from us creating a conversation locally — local
     // state is already correct and resetting here would wipe the in-flight messages.
-    const target = initialConversationId || "";
+    const target = conversationIdParam || "";
     if (target && target === justCreatedIdRef.current) return;
+    if (inflight.loading && inflightMatches(target, promptParam)) {
+      justCreatedIdRef.current = inflight.conversationId || target;
+      setConversationId(inflight.conversationId || target);
+      setMessages(inflight.messages);
+      setLoading(true);
+      return;
+    }
+    if (!target && inflight.loading && inflight.prompt && inflight.prompt === promptParam) {
+      setMessages(inflight.messages);
+      setLoading(true);
+      if (inflight.conversationId) {
+        justCreatedIdRef.current = inflight.conversationId;
+        setConversationId(inflight.conversationId);
+      }
+      return;
+    }
     justCreatedIdRef.current = "";
     setConversationId(target);
     setConversationTitle("");
     setMessages([]);
-  }, [initialConversationId]);
+    setLoading(false);
+  }, [conversationIdParam, promptParam]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,9 +189,19 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
     async function loadConversation() {
       if (!authToken || !conversationId) return;
       if (conversationId === justCreatedIdRef.current) return;
+      if (conversationId === inflight.conversationId && inflight.loading) {
+        setMessages(inflight.messages);
+        setLoading(true);
+        return;
+      }
       try {
         const data = await fetchConversation(authToken, conversationId);
         if (cancelled) return;
+        if (conversationId === inflight.conversationId && inflight.loading) {
+          setMessages(inflight.messages);
+          setLoading(true);
+          return;
+        }
         const convo = data?.conversation;
         setConversationTitle(convo?.title || "");
         setMessages(
@@ -116,56 +230,80 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   }, [authToken, conversationId]);
 
   useEffect(() => {
-    // Arriving with ?prompt= (e.g. Outcome "Partially") — auto-send once per prompt.
-    if (!initialPrompt || !isAuthenticated || profileLoading) return;
-    if (autoSentPromptRef.current === initialPrompt) return;
-    if (conversationId) return;
-    autoSentPromptRef.current = initialPrompt;
-    sendMessage(initialPrompt).catch(() => null);
+    // Arriving with ?prompt= (e.g. Outcome "Partially" / Daily Pulse help) — auto-send once.
+    // Do not wait for conversationId to become empty: force a new thread even if we were
+    // still sitting on a previous chat when the banner navigated here.
+    if (!promptParam || !isAuthenticated || profileLoading) return;
+    if (conversationIdParam) return;
+    if (autoSentPromptRef.current === promptParam) return;
+    autoSentPromptRef.current = promptParam;
+    sendMessage(promptParam, { forceNew: true }).catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPrompt, isAuthenticated, profileLoading, conversationId]);
+  }, [promptParam, conversationIdParam, isAuthenticated, profileLoading]);
 
-  async function ensureConversationId(firstUserMessage) {
-    if (conversationId) return conversationId;
+  async function adoptCreatedConversation(nextId) {
+    if (!nextId) return;
+    justCreatedIdRef.current = nextId;
+    conversationIdRef.current = nextId;
+    setConversationId(nextId);
+    writeInflight({ conversationId: nextId });
+    router.replace(`/chat?c=${encodeURIComponent(nextId)}`);
+    refreshHistory().catch(() => null);
+  }
+
+  async function ensureConversationId(firstUserMessage, { forceNew = false } = {}) {
+    if (!forceNew && conversationIdRef.current) return conversationIdRef.current;
     if (!authToken) return "";
     const created = await createConversation(authToken, { firstMessage: firstUserMessage });
     const nextId = created?.conversation?.id || "";
-    if (nextId) {
-      // Mark this id as locally created BEFORE the state/URL changes so the sync effects
-      // don't wipe our in-flight messages or refetch an empty conversation.
-      justCreatedIdRef.current = nextId;
-      setConversationId(nextId);
-      router.replace(`/chat?c=${encodeURIComponent(nextId)}`);
-      refreshHistory().catch(() => null);
-    }
+    await adoptCreatedConversation(nextId);
     return nextId;
   }
 
-  async function ensureValidConversationId(preferredId, firstUserMessage) {
-    // If the current conversation id doesn't exist on the backend anymore, create a new one.
+  async function ensureValidConversationId(preferredId, firstUserMessage, { forceNew = false } = {}) {
     if (!authToken) return preferredId || "";
-    if (!preferredId) return await ensureConversationId(firstUserMessage);
+    if (forceNew || !preferredId) return await ensureConversationId(firstUserMessage, { forceNew: true });
 
     try {
       await fetchConversation(authToken, preferredId);
       return preferredId;
     } catch {
       setConversationId("");
-      const created = await createConversation(authToken, { firstMessage: firstUserMessage });
-      const nextId = created?.conversation?.id || "";
-      if (nextId) {
-        justCreatedIdRef.current = nextId;
-        setConversationId(nextId);
-        router.replace(`/chat?c=${encodeURIComponent(nextId)}`);
-        refreshHistory().catch(() => null);
-      }
-      return nextId;
+      conversationIdRef.current = "";
+      return await ensureConversationId(firstUserMessage, { forceNew: true });
     }
   }
 
-  async function sendMessage(text) {
+  function applyAssistantText(full, generation) {
+    const update = (current) => {
+      if (generation !== inflight.generation) return current;
+      const base = current.length ? current : inflight.messages;
+      if (!base.length) {
+        const prompt = inflight.prompt || "";
+        return [
+          { role: "user", content: prompt, attachments: [] },
+          { role: "assistant", content: full, attachments: [] },
+        ];
+      }
+      const copy = [...base];
+      const last = copy[copy.length - 1];
+      if (!last || last.role !== "assistant") {
+        copy.push({ role: "assistant", content: full, attachments: [] });
+        return copy;
+      }
+      copy[copy.length - 1] = { ...last, content: full };
+      return copy;
+    };
+    const next = update(inflight.messages);
+    writeInflight({ messages: next });
+    if (inflight.conversationId && conversationIdRef.current !== inflight.conversationId) return;
+    setMessages(update);
+  }
+
+  async function sendMessage(text, { forceNew = false } = {}) {
     const baseText = text || input.trim();
-    if ((!baseText && !attachments.length) || loading) return;
+    if (!baseText && !attachments.length) return;
+    if (loadingRef.current && !forceNew) return;
 
     const contentForHistory = baseText.trim();
     const messageAttachments = attachmentSummary.map((a) => ({
@@ -190,16 +328,35 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         })),
     ];
 
-    const nextMessages = [...messages, { role: "user", content: contentForHistory, attachments: messageAttachments }];
-    const nextMessagesForApi = toAnthropicMessages([...messages, { role: "user", content: contentBlocks }]);
-    // Create placeholder assistant message so we can stream into it.
-    setMessages([...nextMessages, { role: "assistant", content: "" }]);
+    const history = forceNew ? [] : messagesRef.current || [];
+    const nextMessages = [...history, { role: "user", content: contentForHistory, attachments: messageAttachments }];
+    const nextMessagesForApi = toAnthropicMessages([...history, { role: "user", content: contentBlocks }]);
+    const thread = [...nextMessages, { role: "assistant", content: "" }];
+    const generation = ++sendGenRef.current;
+
+    writeInflight({
+      conversationId: forceNew ? "" : conversationIdRef.current || "",
+      prompt: contentForHistory,
+      messages: thread,
+      loading: true,
+      generation,
+    });
+    if (forceNew) {
+      justCreatedIdRef.current = "";
+      conversationIdRef.current = "";
+      setConversationId("");
+      setConversationTitle("");
+    }
+    setMessages(thread);
     setInput("");
     setAttachments([]);
     setLoading(true);
-    let convoId = conversationId;
+
+    let convoId = forceNew ? "" : conversationIdRef.current;
     try {
-      convoId = await ensureValidConversationId(convoId, baseText || "New chat");
+      convoId = await ensureValidConversationId(convoId, baseText || "New chat", { forceNew });
+      if (generation !== inflight.generation) return;
+      if (convoId) writeInflight({ conversationId: convoId });
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "user", content: contentForHistory || "See attachments.", attachments: messageAttachments }]);
@@ -214,27 +371,15 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         messages: nextMessagesForApi,
         maxTokens: maxTokensByTier,
         onText: (_delta, full) => {
+          if (generation !== inflight.generation) return;
           finalText = full;
-          setMessages((current) => {
-            if (!current.length) return current;
-            const copy = [...current];
-            const last = copy[copy.length - 1];
-            if (!last || last.role !== "assistant") return copy;
-            copy[copy.length - 1] = { ...last, content: full };
-            return copy;
-          });
+          applyAssistantText(full, generation);
         },
       });
 
+      if (generation !== inflight.generation) return;
       const assistantContent = data.content?.[0]?.text || finalText || "Something went wrong.";
-      setMessages((current) => {
-        if (!current.length) return current;
-        const copy = [...current];
-        const last = copy[copy.length - 1];
-        if (!last || last.role !== "assistant") return copy;
-        copy[copy.length - 1] = { ...last, content: assistantContent, attachments: [] };
-        return copy;
-      });
+      applyAssistantText(assistantContent, generation);
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "assistant", content: assistantContent }]);
@@ -243,16 +388,9 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         }
       }
     } catch (error) {
+      if (generation !== inflight.generation) return;
       const assistantContent = error.message || "Request failed.";
-      setMessages((current) => {
-        // Replace placeholder assistant message if present, else append.
-        const copy = Array.isArray(current) ? [...current] : [];
-        if (copy.length && copy[copy.length - 1]?.role === "assistant") {
-          copy[copy.length - 1] = { role: "assistant", content: assistantContent, attachments: [] };
-          return copy;
-        }
-        return [...nextMessages, { role: "assistant", content: assistantContent, attachments: [] }];
-      });
+      applyAssistantText(assistantContent, generation);
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "assistant", content: assistantContent }]);
@@ -261,7 +399,10 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         }
       }
     } finally {
-      setLoading(false);
+      if (generation === inflight.generation) {
+        setLoading(false);
+        writeInflight({ loading: false, messages: inflight.messages });
+      }
     }
   }
 
@@ -372,7 +513,7 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
       </div>
 
       <div className="chat-thread">
-        {messages.length ? (
+        {messages.length || loading ? (
           <div style={{ display: "grid", gap: "16px" }}>
             {messages.map((msg, i) => (
               <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
@@ -593,7 +734,7 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
         }}
       />
 
-      {messages.length ? (
+      {messages.length || loading ? (
         <>
           {attachments.length ? (
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
