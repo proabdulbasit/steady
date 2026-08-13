@@ -1,6 +1,6 @@
 const express = require("express");
 const { optionalAuth, requireAuth } = require("../middleware/auth");
-const { authorizeQuestion, resolveActor, serializeUser } = require("../lib/user-service");
+const { authorizeQuestion, resolveActor, serializeUser, userHasActiveSubscription } = require("../lib/user-service");
 
 const router = express.Router();
 
@@ -46,7 +46,7 @@ router.post("/authorize", requireAuth, async (req, res) => {
     return res.status(401).json({ error: "Please sign in before chatting." });
   }
 
-  if (actor.user.planSelected === false) {
+  if (actor.user.planSelected === false && !userHasActiveSubscription(actor.user)) {
     return res.status(403).json({ error: "Please choose a plan before chatting." });
   }
   const result = await authorizeQuestion(actor, { consume: Boolean(consume) });

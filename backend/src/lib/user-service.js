@@ -77,6 +77,12 @@ function serializeIntegrationsForClient(user) {
   }));
 }
 
+function userHasActiveSubscription(user) {
+  if (!user) return false;
+  const plan = getPlanConfig(user.planId);
+  return plan.id !== PLAN_IDS.FREE && ["active", "trialing", "past_due"].includes(user.subscriptionStatus);
+}
+
 function serializeUser(user) {
   const plan = getPlanConfig(user.planId);
   normalizeUsage(user);
@@ -101,8 +107,7 @@ function serializeUser(user) {
     dailyQuestionLimit: plan.dailyQuestionLimit,
     features: plan.features,
     integrations: serializeIntegrationsForClient(user),
-    hasActiveSubscription:
-      plan.id !== PLAN_IDS.FREE && ["active", "trialing", "past_due"].includes(user.subscriptionStatus),
+    hasActiveSubscription: userHasActiveSubscription(user),
     briefingDelivery: {
       emailEnabled: user.briefingDelivery?.emailEnabled !== false,
       pushEnabled: user.briefingDelivery?.pushEnabled !== false,
@@ -207,4 +212,5 @@ module.exports = {
   resolveActor,
   serializeIntegrationsForClient,
   serializeUser,
+  userHasActiveSubscription,
 };
