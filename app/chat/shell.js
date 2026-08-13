@@ -12,6 +12,7 @@ export default function ChatShell({ children }) {
   const searchParams = useSearchParams();
   const activeId = searchParams?.get("c") || "";
   const isNew = searchParams?.get("new") === "1";
+  const hasPrompt = Boolean(searchParams?.get("prompt"));
   const { authToken, isAuthenticated } = useSteady();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -39,15 +40,17 @@ export default function ChatShell({ children }) {
 
   useEffect(() => {
     // If user visits /chat without selecting a conversation, open the most recent one by default.
-    // Skip this when the user explicitly opened a fresh chat (?new=1) — we want an empty state
-    // until they send the first message.
+    // Skip this when they explicitly opened a fresh chat (?new=1) or arrived with ?prompt=
+    // (Outcome "Partially" / Daily Pulse "help me") — those must start a new thread, not
+    // steal the URL back to the previous conversation mid-send.
     if (activeId) return;
     if (isNew) return;
+    if (hasPrompt) return;
     if (!conversations?.length) return;
     const first = conversations[0];
     if (!first?.id) return;
     router.replace(`/chat?c=${encodeURIComponent(first.id)}`);
-  }, [activeId, conversations, isNew, router]);
+  }, [activeId, conversations, hasPrompt, isNew, router]);
 
   useEffect(() => {
     // Close the mobile drawer when navigation changes.

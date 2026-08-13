@@ -19,6 +19,7 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
   const [menuPos, setMenuPos] = useState(null); // { top, left }
   const [menuChat, setMenuChat] = useState(null);
   const menuRef = useRef(null);
+  const sidebarRef = useRef(null);
   const [toast, setToast] = useState("");
   const toastTimerRef = useRef(null);
   const [shareChat, setShareChat] = useState(null); // { id, title }
@@ -156,6 +157,30 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
   }, [menuAnchor, menuForId]);
 
   useEffect(() => {
+    if (!activeId) return;
+    const root = sidebarRef.current;
+    if (!root) return;
+
+    const revealActive = () => {
+      const item = root.querySelector(`[data-conversation-id="${activeId}"]`);
+      if (!item) return;
+      const rootRect = root.getBoundingClientRect();
+      const itemRect = item.getBoundingClientRect();
+      const visible = itemRect.top >= rootRect.top && itemRect.bottom <= rootRect.bottom;
+      if (visible) return;
+      const idx = items.findIndex((c) => c.id === activeId);
+      if (idx === 0) {
+        root.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      item.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+
+    const frame = requestAnimationFrame(revealActive);
+    return () => cancelAnimationFrame(frame);
+  }, [activeId, items]);
+
+  useEffect(() => {
     if (!menuForId || !menuAnchor || !menuPos) return;
     const el = menuRef.current;
     if (!el) return;
@@ -181,6 +206,7 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
 
   return (
     <aside
+      ref={sidebarRef}
       className={`steady-chat-sidebar surface-chrome ${mobileOpen ? "is-open" : ""}`}
       style={{
         width: "280px",
@@ -256,6 +282,7 @@ export default function ChatSidebar({ mobileOpen = false, onMobileClose = () => 
                 <div
                   key={c.id}
                   data-chat-menu-root
+                  data-conversation-id={c.id}
                   style={{
                     position: "relative",
                     border: isActive ? "1px solid var(--gold-ring)" : "1px solid var(--line)",

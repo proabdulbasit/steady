@@ -5,26 +5,27 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GoldButton } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
+import { getPostAuthPath } from "../../lib/auth-redirect";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, profileLoading } = useSteady();
+  const { login, isAuthenticated, profile, profileLoading } = useSteady();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (profileLoading) return;
-    if (isAuthenticated) router.replace("/pricing");
-  }, [isAuthenticated, profileLoading, router]);
+    if (isAuthenticated) router.replace(getPostAuthPath(profile));
+  }, [isAuthenticated, profile, profileLoading, router]);
 
   async function handleSubmit(e) {
     e?.preventDefault?.();
     setLoading(true);
     setError("");
     try {
-      await login(form);
-      router.push("/pricing");
+      const result = await login(form);
+      router.push(getPostAuthPath(result.user));
     } catch (err) {
       setError(err.message || "Unable to sign in.");
     } finally {

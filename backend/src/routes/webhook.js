@@ -38,6 +38,12 @@ async function syncSubscription(subscription, fallbackUserId = "") {
   const nextPlanId = plan?.id || fallbackPlanId || user.planId || PLAN_IDS.FREE;
   user.planId = nextPlanId;
   user.subscriptionStatus = detailedSubscription.status || "inactive";
+  if (
+    nextPlanId !== PLAN_IDS.FREE &&
+    ["active", "trialing", "past_due"].includes(user.subscriptionStatus)
+  ) {
+    user.planSelected = true;
+  }
   user.stripeCustomerId = stripeCustomerId || user.stripeCustomerId;
   user.stripeSubscriptionId = detailedSubscription.id;
   user.currentPeriodEnd = detailedSubscription.current_period_end
@@ -76,6 +82,7 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
           user.lastCheckoutSessionId = session.id;
           user.planId = session.metadata?.planId || user.planId;
           user.subscriptionStatus = "active";
+          user.planSelected = true;
           if (session.metadata?.sessionId && !user.sessionIds.includes(session.metadata.sessionId)) {
             user.sessionIds.push(session.metadata.sessionId);
           }
