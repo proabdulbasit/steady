@@ -8,6 +8,7 @@ import {
   fetchDueOutcomes,
   respondToOutcome,
 } from "../lib/outcomes-client";
+import { chatPathWithPrompt } from "../lib/chat-client";
 
 function formatInline(text) {
   const raw = String(text ?? "");
@@ -105,7 +106,7 @@ export function OutcomeCheckupBanner() {
       await respondToOutcome({ authToken, outcomeId: active.id, status });
       if (status === "partially") {
         const prompt = buildPartialFollowUpPrompt(active);
-        router.push(`/chat?${new URLSearchParams({ prompt })}`);
+        router.push(chatPathWithPrompt(prompt));
       }
       await refresh();
     } catch (err) {
