@@ -11,6 +11,7 @@ import {
   seedPulsePattern,
 } from "../lib/daily-pulse-client";
 import { fetchPendingOutcomes, forceOutcomeDue } from "../lib/outcomes-client";
+import { chatPathWithPrompt } from "../lib/chat-client";
 
 const LEVELS = [
   { id: "busy", label: "Busy" },
@@ -97,7 +98,7 @@ export function DailyPulseBanner() {
     setBusy("help");
     try {
       await dismissPulsePattern({ authToken, dateKey }).catch(() => null);
-      router.push(`/chat?${new URLSearchParams({ prompt: pattern.helpPrompt })}`);
+      router.push(chatPathWithPrompt(pattern.helpPrompt));
       setPattern(null);
     } finally {
       setBusy("");

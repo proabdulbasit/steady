@@ -320,7 +320,7 @@ function FinalCTA() {
           <div className="eyebrow" style={{ marginBottom: 18, textAlign: "center" }}>Or start with a question owners actually ask</div>
           <div className="home-starters" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             {STARTER_QUESTIONS.map((q) => (
-              <Link key={q} href={`/chat?prompt=${encodeURIComponent(q)}`} className="starter">{q}</Link>
+              <Link key={q} href={`/chat?new=1&prompt=${encodeURIComponent(q)}`} className="starter">{q}</Link>
             ))}
           </div>
         </div>
