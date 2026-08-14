@@ -10,29 +10,12 @@ const {
 } = require("../lib/reset-token");
 const { attachSessionToUser, ensureBusinessIntegrationSlots, getUserByEmail, getUserById, serializeUser } = require("../lib/user-service");
 const { requireAuth } = require("../middleware/auth");
+const { normalizeIndustry } = require("../lib/industries");
 
 const router = express.Router();
 
 const RESET_SENT_MESSAGE =
   "If an account exists for that email address, check your inbox for a reset link.";
-
-const ALLOWED_INDUSTRIES = new Set([
-  "restaurant",
-  "pawnshop",
-  "auto_shop",
-  "retail",
-  "salon",
-  "cleaning",
-  "contractor",
-  "food_truck",
-  "landscaping",
-  "gym",
-  "other",
-]);
-
-function normalizeIndustry(value) {
-  return ALLOWED_INDUSTRIES.has(value) ? value : "restaurant";
-}
 
 router.post("/register", async (req, res) => {
   const { name = "", email = "", password = "", sessionId = "", industry = "restaurant" } = req.body || {};
@@ -53,7 +36,7 @@ router.post("/register", async (req, res) => {
     name: name.trim(),
     email: email.toLowerCase().trim(),
     passwordHash: await hashPassword(password),
-    industry: normalizeIndustry(industry),
+    industry: normalizeIndustry(industry, "other"),
     role:
       process.env.ADMIN_EMAIL &&
       email.toLowerCase().trim() === process.env.ADMIN_EMAIL.toLowerCase().trim()

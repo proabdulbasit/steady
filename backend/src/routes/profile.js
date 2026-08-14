@@ -6,19 +6,7 @@ const Conversation = require("../models/Conversation");
 
 const router = express.Router();
 
-const ALLOWED_INDUSTRIES = new Set([
-  "restaurant",
-  "pawnshop",
-  "auto_shop",
-  "retail",
-  "salon",
-  "cleaning",
-  "contractor",
-  "food_truck",
-  "landscaping",
-  "gym",
-  "other",
-]);
+const { ALLOWED_INDUSTRIES } = require("../lib/industries");
 
 router.get("/me", requireAuth, async (req, res) => {
   const user = await getUserById(req.auth.sub);

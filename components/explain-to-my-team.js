@@ -9,7 +9,7 @@ import { explainToMyTeam } from "../lib/explain-to-team-client";
  * One-click rewrite of any Steady response into plain staff language + copy.
  */
 export function ExplainToMyTeam({ advice, compact = false }) {
-  const { authToken, isAuthenticated } = useSteady();
+  const { authToken, isAuthenticated, isPremium } = useSteady();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -17,7 +17,7 @@ export function ExplainToMyTeam({ advice, compact = false }) {
   const [copied, setCopied] = useState(false);
 
   const source = String(advice || "").trim();
-  const canUse = Boolean(isAuthenticated && source && !loading);
+  const canUse = Boolean(isAuthenticated && isPremium && source && !loading);
 
   useEffect(() => {
     // Reset when the underlying Steady response changes.
@@ -65,7 +65,7 @@ export function ExplainToMyTeam({ advice, compact = false }) {
           className="btn btn-ghost btn-sm"
           onClick={handleExplain}
           disabled={!canUse}
-          title="Rewrite in plain language for your staff"
+          title={isPremium ? "Rewrite in plain language for your staff" : "Upgrade to Pro or Business to rewrite for your team"}
           style={{
             borderColor: "var(--gold-ring)",
             color: "var(--ink)",
@@ -74,6 +74,9 @@ export function ExplainToMyTeam({ advice, compact = false }) {
         >
           {loading ? "Rewriting…" : "Explain to my team"}
         </button>
+        {!isPremium ? (
+          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>Pro / Business</span>
+        ) : null}
         {open && explanation && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={handleCopy}>
             {copied ? "Copied" : "Copy for staff"}

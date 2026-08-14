@@ -28,7 +28,7 @@ router.get("/today", requireAuth, async (req, res) => {
       : localTodayFallback();
 
   const pulse = await getTodayPulse(req.auth.sub, dateKey);
-  const history = await listRecentPulses(req.auth.sub, { limit: 14 });
+  const history = await listRecentPulses(req.auth.sub, { limit: 30 });
 
   let pattern = null;
   if (pulse?.patternKey && !pulse.patternDismissedAt) {
@@ -74,7 +74,9 @@ router.post("/", requireAuth, async (req, res) => {
         ? req.body.dateKey
         : localTodayFallback();
 
-    const result = await logDailyPulse(req.auth.sub, { dateKey, level });
+    const note = typeof req.body?.note === "string" ? req.body.note : "";
+
+    const result = await logDailyPulse(req.auth.sub, { dateKey, level, note });
     return res.json({ ok: true, ...result, needsCheckin: false });
   } catch (error) {
     const status = error.status || 500;

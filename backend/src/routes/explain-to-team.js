@@ -2,6 +2,7 @@ const express = require("express");
 const { requireAuth } = require("../middleware/auth");
 const { getUserById } = require("../lib/user-service");
 const { explainAdviceForTeam } = require("../lib/explain-to-team");
+const { getPlanConfig, PLAN_IDS } = require("../config/plans");
 
 const router = express.Router();
 
@@ -15,6 +16,14 @@ router.post("/", requireAuth, async (req, res) => {
   try {
     const user = await getUserById(req.auth.sub);
     if (!user) return res.status(404).json({ error: "User not found." });
+
+    const plan = getPlanConfig(user.planId || PLAN_IDS.FREE);
+    if (!plan.features?.premiumTools) {
+      return res.status(403).json({
+        error: "Upgrade to Pro or Business to rewrite advice for your team.",
+        planId: plan.id,
+      });
+    }
 
     const advice = typeof req.body?.advice === "string" ? req.body.advice : "";
     const result = await explainAdviceForTeam({

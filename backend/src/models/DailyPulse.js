@@ -13,6 +13,7 @@ const DailyPulseSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    note: { type: String, default: "", trim: true },
     /** Pattern flag shown after this tap (if any). */
     patternKey: { type: String, default: "", index: true },
     patternMessage: { type: String, default: "" },

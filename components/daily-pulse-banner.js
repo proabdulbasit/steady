@@ -10,13 +10,30 @@ import {
   logPulse,
   seedPulsePattern,
 } from "../lib/daily-pulse-client";
-import { fetchPendingOutcomes, forceOutcomeDue } from "../lib/outcomes-client";
+import { fetchPendingOutcomes, forceOutcomeDue, sendDueOutcomeEmails } from "../lib/outcomes-client";
+import { chatPathWithPrompt } from "../lib/chat-client";
 
 const LEVELS = [
   { id: "busy", label: "Busy" },
   { id: "normal", label: "Normal" },
   { id: "slow", label: "Slow" },
 ];
+
+function skipStorageKey(dateKey) {
+  return `steady-pulse-skip:${dateKey}`;
+}
+
+function last30DateKeys(endKey) {
+  const [y, m, d] = String(endKey).split("-").map(Number);
+  const end = new Date(y, m - 1, d);
+  const keys = [];
+  for (let i = 29; i >= 0; i -= 1) {
+    const dt = new Date(end);
+    dt.setDate(end.getDate() - i);
+    keys.push(localDateKey(dt));
+  }
+  return keys;
+}
 
 /**
  * Daily Pulse Check — compact top bar: Busy / Normal / Slow + pattern help.
@@ -34,8 +51,20 @@ export function DailyPulseBanner() {
   const [pendingOutcomes, setPendingOutcomes] = useState([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [savedFlash, setSavedFlash] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [skipped, setSkipped] = useState(false);
+
+  useEffect(() => {
+    try {
+      setSkipped(typeof window !== "undefined" && window.localStorage.getItem(skipStorageKey(dateKey)) === "1");
+    } catch {
+      setSkipped(false);
+    }
+  }, [dateKey]);
 
   const refresh = useCallback(async () => {
     if (!authToken) return;
@@ -63,12 +92,13 @@ export function DailyPulseBanner() {
     return null;
   }
 
-  const showCheckin = needsCheckin;
+  const showCheckin = needsCheckin && !skipped;
   const showPattern = Boolean(pattern?.message) && !pulse?.patternDismissedAt;
-  // After today's tap: don't pin a fixed bar on every page (Upload, Home, etc.).
-  // Keep a slim retap control only on Chat — the daily habit is the one 10-second check-in.
+  const onHome = pathname === "/";
+  const onChat = Boolean(pathname?.startsWith("/chat"));
+  // After today's tap, keep a slim bar on Home (calendar) and Chat (retap + calendar).
   const showCompact =
-    !showCheckin && !showPattern && Boolean(pulse) && pathname?.startsWith("/chat");
+    !showCheckin && !showPattern && Boolean(pulse) && (onChat || onHome);
 
   if (!showCheckin && !showPattern && !showCompact) return null;
 
@@ -78,7 +108,7 @@ export function DailyPulseBanner() {
     setError("");
     setSavedFlash(false);
     try {
-      const data = await logPulse({ authToken, level, dateKey });
+      const data = await logPulse({ authToken, level, note, dateKey });
       setPulse(data.pulse || null);
       setPattern(data.pattern || null);
       setHistory(Array.isArray(data.history) ? data.history : []);
@@ -97,7 +127,7 @@ export function DailyPulseBanner() {
     setBusy("help");
     try {
       await dismissPulsePattern({ authToken, dateKey }).catch(() => null);
-      router.push(`/chat?${new URLSearchParams({ prompt: pattern.helpPrompt })}`);
+      router.push(chatPathWithPrompt(pattern.helpPrompt));
       setPattern(null);
     } finally {
       setBusy("");
@@ -146,6 +176,35 @@ export function DailyPulseBanner() {
     }
   }
 
+  async function handleSendDueEmails() {
+    setBusy("email");
+    setError("");
+    setNotice("");
+    try {
+      const data = await sendDueOutcomeEmails({ authToken });
+      const sent = Number(data?.sent || 0);
+      const checked = Number(data?.checked || 0);
+      setNotice(
+        sent
+          ? `Sent ${sent} follow-up email${sent === 1 ? "" : "s"} (${checked} due). Check inbox and Mailgun logs.`
+          : `No emails sent. ${checked} due checkup${checked === 1 ? "" : "s"} found — ask Steady for advice, wait 1 minute (or Make outcome due now), then try again.`
+      );
+    } catch (err) {
+      setError(err.message || "Could not send follow-up emails.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const pulseChipStyle = {
+    minWidth: showCheckin ? 88 : 72,
+    padding: showCheckin ? "9px 14px" : "5px 12px",
+    fontSize: showCheckin ? 14 : 12,
+    fontWeight: 600,
+    lineHeight: 1.2,
+    color: "var(--ink)",
+  };
+
   const levelButtons = (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       {LEVELS.map((opt) => {
@@ -158,13 +217,9 @@ export function DailyPulseBanner() {
             onClick={() => handleTap(opt.id)}
             className="btn btn-sm"
             style={{
-              minWidth: showCheckin ? 88 : 72,
-              padding: showCheckin ? "8px 14px" : "5px 12px",
-              fontSize: showCheckin ? 14 : 12,
-              fontWeight: 600,
+              ...pulseChipStyle,
               border: selected ? "1px solid var(--gold)" : "1px solid var(--line)",
               background: selected ? "var(--gold-soft)" : "var(--bg)",
-              color: "var(--ink)",
               boxShadow: selected ? "inset 0 0 0 1px var(--gold-ring)" : "none",
             }}
           >
@@ -173,6 +228,23 @@ export function DailyPulseBanner() {
         );
       })}
     </div>
+  );
+
+  const calendarButton = (
+    <button
+      type="button"
+      className="btn btn-sm"
+      onClick={() => setCalendarOpen((v) => !v)}
+      style={{
+        ...pulseChipStyle,
+        minWidth: showCheckin ? 88 : "auto",
+        border: calendarOpen ? "1px solid var(--gold)" : "1px solid var(--line)",
+        background: calendarOpen ? "var(--gold-soft)" : "var(--bg)",
+        boxShadow: calendarOpen ? "inset 0 0 0 1px var(--gold-ring)" : "none",
+      }}
+    >
+      {calendarOpen ? "Hide calendar" : "30 days"}
+    </button>
   );
 
   return (
@@ -211,6 +283,41 @@ export function DailyPulseBanner() {
               </div>
             </div>
             {levelButtons}
+            <div style={{ width: "100%", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value.slice(0, 280))}
+                placeholder="Anything specific going on? (optional)"
+                style={{
+                  flex: "1 1 220px",
+                  minWidth: 180,
+                  background: "var(--bg)",
+                  border: "1px solid var(--line)",
+                  borderRadius: 10,
+                  padding: "8px 12px",
+                  color: "var(--ink)",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={Boolean(busy)}
+                onClick={() => {
+                  try {
+                    window.localStorage.setItem(skipStorageKey(dateKey), "1");
+                  } catch {
+                    // ignore
+                  }
+                  setSkipped(true);
+                }}
+                style={{ color: "var(--ink-3)" }}
+              >
+                Skip today
+              </button>
+              {calendarButton}
+            </div>
           </div>
         )}
 
@@ -300,8 +407,9 @@ export function DailyPulseBanner() {
               </span>
             </div>
 
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               {levelButtons}
+              {calendarButton}
               {pathname?.startsWith("/chat") && (
                 <button
                   type="button"
@@ -325,6 +433,10 @@ export function DailyPulseBanner() {
             </div>
           </div>
         )}
+
+        {calendarOpen && (showCompact || showCheckin || showPattern) ? (
+          <PulseMonthGrid dateKey={dateKey} history={history} />
+        ) : null}
 
         {toolsOpen && pathname?.startsWith("/chat") && (
           <div
@@ -352,6 +464,14 @@ export function DailyPulseBanner() {
             >
               {busy === "force" ? "…" : "Make outcome due now"}
             </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={Boolean(busy)}
+              onClick={handleSendDueEmails}
+            >
+              {busy === "email" ? "Sending…" : "Send follow-up emails now"}
+            </button>
             {!pendingOutcomes.length ? (
               <span style={{ fontSize: 12, color: "var(--ink-3)" }}>No pending outcome yet — ask Steady for advice first</span>
             ) : null}
@@ -359,9 +479,49 @@ export function DailyPulseBanner() {
         )}
 
         {error ? <div style={{ marginTop: 8, fontSize: 13, color: "var(--danger)" }}>{error}</div> : null}
+        {notice ? <div style={{ marginTop: 8, fontSize: 13, color: "var(--ink-2)" }}>{notice}</div> : null}
         {savedFlash && showCheckin === false && showPattern ? (
           <div style={{ marginTop: 6, fontSize: 12, color: "var(--ink-3)" }}>Pulse saved</div>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function PulseMonthGrid({ dateKey, history }) {
+  const byKey = new Map((history || []).map((h) => [h.dateKey, h]));
+  const keys = last30DateKeys(dateKey);
+  return (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+      <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 700, marginBottom: 8 }}>
+        Last 30 days
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(10, minmax(0, 1fr))", gap: 6 }}>
+        {keys.map((key) => {
+          const h = byKey.get(key);
+          const level = h?.level;
+          const bg =
+            level === "busy" ? "var(--gold)" : level === "slow" ? "var(--ink-4)" : level === "normal" ? "var(--line-strong)" : "var(--bg-soft)";
+          return (
+            <span
+              key={key}
+              title={h ? `${key} · ${h.level}` : `${key} · no check-in`}
+              style={{
+                display: "block",
+                height: 10,
+                borderRadius: 3,
+                background: bg,
+                border: "1px solid var(--line)",
+              }}
+            />
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 11, color: "var(--ink-3)" }}>
+        <span>Busy</span>
+        <span>Normal</span>
+        <span>Slow</span>
+        <span>No log</span>
       </div>
     </div>
   );

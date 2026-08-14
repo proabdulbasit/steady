@@ -6,26 +6,27 @@ import Link from "next/link";
 import { GoldButton } from "../../components/steady-ui";
 import { useSteady } from "../../components/steady-provider";
 import { INDUSTRY_OPTIONS } from "../../lib/industry-prompts";
+import { getPostAuthPath } from "../../lib/auth-redirect";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, isAuthenticated, profileLoading } = useSteady();
+  const { register, isAuthenticated, profile, profileLoading } = useSteady();
   const [form, setForm] = useState({ name: "", email: "", password: "", industry: "restaurant" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (profileLoading) return;
-    if (isAuthenticated) router.replace("/pricing");
-  }, [isAuthenticated, profileLoading, router]);
+    if (isAuthenticated) router.replace(getPostAuthPath(profile));
+  }, [isAuthenticated, profile, profileLoading, router]);
 
   async function handleSubmit(e) {
     e?.preventDefault?.();
     setLoading(true);
     setError("");
     try {
-      await register(form);
-      router.push("/pricing");
+      const result = await register(form);
+      router.push(getPostAuthPath(result.user));
     } catch (err) {
       setError(err.message || "Unable to register.");
     } finally {

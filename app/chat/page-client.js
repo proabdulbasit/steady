@@ -6,30 +6,74 @@ import { ExplainToMyTeam } from "../../components/explain-to-my-team";
 import { ChatVoiceButton } from "../../components/chat-voice-button";
 import { ChatVoiceMode, ChatVoiceModeLaunchButton } from "../../components/chat-voice-mode";
 import { useSteady } from "../../components/steady-provider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { appendConversationMessages, createConversation, fetchConversation } from "../../lib/chat-client";
 import { useChatHistory } from "./chat-history-context";
 import { PLAN_IDS } from "../../lib/plans";
+import { canAccessApp } from "../../lib/auth-redirect";
 
-export default function ChatClientPage({ initialPrompt = "", initialConversationId = "" }) {
+/**
+ * Survives ChatClientPage remounts when the URL flips from ?prompt= to ?c=id mid-stream.
+ * The async send keeps writing here; a newly mounted instance subscribes and paints it.
+ */
+const inflight = {
+  conversationId: "",
+  prompt: "",
+  messages: [],
+  loading: false,
+  generation: 0,
+};
+const inflightSubs = new Set();
+
+function publishInflight() {
+  const snap = {
+    conversationId: inflight.conversationId,
+    prompt: inflight.prompt,
+    messages: inflight.messages,
+    loading: inflight.loading,
+    generation: inflight.generation,
+  };
+  inflightSubs.forEach((fn) => fn(snap));
+}
+
+function writeInflight(patch) {
+  Object.assign(inflight, patch);
+  publishInflight();
+}
+
+function inflightMatches(conversationId, prompt) {
+  if (inflight.conversationId && conversationId && inflight.conversationId === conversationId) return true;
+  if (inflight.loading && inflight.prompt && prompt && inflight.prompt === prompt) return true;
+  return false;
+}
+
+export default function ChatClientPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const promptParam = searchParams?.get("prompt") || "";
+  const conversationIdParam = searchParams?.get("c") || "";
   const { isPremium, remainingQuestions, runAssistantRequest, runAssistantRequestStream, isAuthenticated, profile, profileLoading, authToken } = useSteady();
   const { refresh: refreshHistory } = useChatHistory();
-  const [input, setInput] = useState(initialPrompt);
+  const [input, setInput] = useState(promptParam);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
-  const [conversationId, setConversationId] = useState(initialConversationId);
+  const [conversationId, setConversationId] = useState(conversationIdParam);
   const [conversationTitle, setConversationTitle] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [voiceError, setVoiceError] = useState("");
+  const [attachHint, setAttachHint] = useState("");
   const [voiceModeOpen, setVoiceModeOpen] = useState(false);
   const justCreatedIdRef = useRef("");
   const autoSentPromptRef = useRef("");
   const voiceSendingRef = useRef(false);
+  const sendGenRef = useRef(0);
   const messagesRef = useRef(messages);
   const conversationIdRef = useRef(conversationId);
+  const promptParamRef = useRef(promptParam);
+  const loadingRef = useRef(loading);
+  const authTokenRef = useRef(authToken);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -38,6 +82,26 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   useEffect(() => {
     conversationIdRef.current = conversationId;
   }, [conversationId]);
+
+  useEffect(() => {
+    promptParamRef.current = promptParam;
+  }, [promptParam]);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  useEffect(() => {
+    if (authTokenRef.current === authToken) return;
+    authTokenRef.current = authToken;
+    writeInflight({
+      conversationId: "",
+      prompt: "",
+      messages: [],
+      loading: false,
+      generation: inflight.generation + 1,
+    });
+  }, [authToken]);
 
   const planId = profile?.planId || PLAN_IDS.FREE;
   const maxTokensByTier = planId === PLAN_IDS.BUSINESS ? 1200 : planId === PLAN_IDS.PRO ? 800 : 400;
@@ -50,10 +114,10 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
       router.replace("/login");
       return;
     }
-    if (profile?.planSelected === false) {
+    if (!canAccessApp(profile)) {
       router.replace("/pricing");
     }
-  }, [isAuthenticated, profile?.planSelected, profileLoading, router]);
+  }, [isAuthenticated, profile, profileLoading, router]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,16 +132,57 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   }, [attachments]);
 
   useEffect(() => {
+    const apply = (snap) => {
+      // Only paint live streams. Completed leftover snapshots must not replace a
+      // full conversation when switching chats or starting voice/new chat.
+      if (!snap?.loading) return;
+      const cid = conversationIdRef.current;
+      const prompt = promptParamRef.current;
+      const matchById =
+        snap.conversationId &&
+        (snap.conversationId === cid || snap.conversationId === justCreatedIdRef.current);
+      const matchByPrompt = snap.prompt && prompt && snap.prompt === prompt;
+      if (!matchById && !matchByPrompt) return;
+      if (snap.conversationId && (!cid || snap.conversationId === justCreatedIdRef.current) && snap.conversationId !== cid) {
+        justCreatedIdRef.current = snap.conversationId;
+        setConversationId(snap.conversationId);
+      }
+      setMessages(snap.messages);
+      setLoading(true);
+    };
+    apply(inflight);
+    inflightSubs.add(apply);
+    return () => inflightSubs.delete(apply);
+  }, []);
+
+  useEffect(() => {
     // When the URL changes (e.g. clicking in sidebar / New chat), make sure our state matches it.
     // Skip the reset when the URL change came from us creating a conversation locally — local
     // state is already correct and resetting here would wipe the in-flight messages.
-    const target = initialConversationId || "";
+    const target = conversationIdParam || "";
     if (target && target === justCreatedIdRef.current) return;
+    if (inflight.loading && inflightMatches(target, promptParam)) {
+      justCreatedIdRef.current = inflight.conversationId || target;
+      setConversationId(inflight.conversationId || target);
+      setMessages(inflight.messages);
+      setLoading(true);
+      return;
+    }
+    if (!target && inflight.loading && inflight.prompt && inflight.prompt === promptParam) {
+      setMessages(inflight.messages);
+      setLoading(true);
+      if (inflight.conversationId) {
+        justCreatedIdRef.current = inflight.conversationId;
+        setConversationId(inflight.conversationId);
+      }
+      return;
+    }
     justCreatedIdRef.current = "";
     setConversationId(target);
     setConversationTitle("");
     setMessages([]);
-  }, [initialConversationId]);
+    setLoading(false);
+  }, [conversationIdParam, promptParam]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,9 +190,19 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
     async function loadConversation() {
       if (!authToken || !conversationId) return;
       if (conversationId === justCreatedIdRef.current) return;
+      if (conversationId === inflight.conversationId && inflight.loading) {
+        setMessages(inflight.messages);
+        setLoading(true);
+        return;
+      }
       try {
         const data = await fetchConversation(authToken, conversationId);
         if (cancelled) return;
+        if (conversationId === inflight.conversationId && inflight.loading) {
+          setMessages(inflight.messages);
+          setLoading(true);
+          return;
+        }
         const convo = data?.conversation;
         setConversationTitle(convo?.title || "");
         setMessages(
@@ -116,56 +231,85 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
   }, [authToken, conversationId]);
 
   useEffect(() => {
-    // Arriving with ?prompt= (e.g. Outcome "Partially") — auto-send once per prompt.
-    if (!initialPrompt || !isAuthenticated || profileLoading) return;
-    if (autoSentPromptRef.current === initialPrompt) return;
-    if (conversationId) return;
-    autoSentPromptRef.current = initialPrompt;
-    sendMessage(initialPrompt).catch(() => null);
+    // Arriving with ?prompt= (e.g. Outcome "Partially" / Daily Pulse help) — auto-send once.
+    // Do not wait for conversationId to become empty: force a new thread even if we were
+    // still sitting on a previous chat when the banner navigated here.
+    if (!promptParam || !isAuthenticated || profileLoading) return;
+    if (conversationIdParam) return;
+    if (autoSentPromptRef.current === promptParam) return;
+    autoSentPromptRef.current = promptParam;
+    sendMessage(promptParam, { forceNew: true }).catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPrompt, isAuthenticated, profileLoading, conversationId]);
+  }, [promptParam, conversationIdParam, isAuthenticated, profileLoading]);
 
-  async function ensureConversationId(firstUserMessage) {
-    if (conversationId) return conversationId;
+  async function adoptCreatedConversation(nextId) {
+    if (!nextId) return;
+    justCreatedIdRef.current = nextId;
+    conversationIdRef.current = nextId;
+    setConversationId(nextId);
+    writeInflight({ conversationId: nextId });
+    router.replace(`/chat?c=${encodeURIComponent(nextId)}`);
+    refreshHistory().catch(() => null);
+  }
+
+  async function ensureConversationId(firstUserMessage, { forceNew = false } = {}) {
+    if (!forceNew && conversationIdRef.current) return conversationIdRef.current;
     if (!authToken) return "";
     const created = await createConversation(authToken, { firstMessage: firstUserMessage });
     const nextId = created?.conversation?.id || "";
-    if (nextId) {
-      // Mark this id as locally created BEFORE the state/URL changes so the sync effects
-      // don't wipe our in-flight messages or refetch an empty conversation.
-      justCreatedIdRef.current = nextId;
-      setConversationId(nextId);
-      router.replace(`/chat?c=${encodeURIComponent(nextId)}`);
-      refreshHistory().catch(() => null);
-    }
+    await adoptCreatedConversation(nextId);
     return nextId;
   }
 
-  async function ensureValidConversationId(preferredId, firstUserMessage) {
-    // If the current conversation id doesn't exist on the backend anymore, create a new one.
+  async function ensureValidConversationId(preferredId, firstUserMessage, { forceNew = false } = {}) {
     if (!authToken) return preferredId || "";
-    if (!preferredId) return await ensureConversationId(firstUserMessage);
+    if (forceNew || !preferredId) return await ensureConversationId(firstUserMessage, { forceNew: true });
 
     try {
       await fetchConversation(authToken, preferredId);
       return preferredId;
     } catch {
       setConversationId("");
-      const created = await createConversation(authToken, { firstMessage: firstUserMessage });
-      const nextId = created?.conversation?.id || "";
-      if (nextId) {
-        justCreatedIdRef.current = nextId;
-        setConversationId(nextId);
-        router.replace(`/chat?c=${encodeURIComponent(nextId)}`);
-        refreshHistory().catch(() => null);
-      }
-      return nextId;
+      conversationIdRef.current = "";
+      return await ensureConversationId(firstUserMessage, { forceNew: true });
     }
   }
 
-  async function sendMessage(text) {
+  function applyAssistantText(full, generation) {
+    const update = (current) => {
+      if (generation !== inflight.generation) return current;
+      const base = current.length ? current : inflight.messages;
+      if (!base.length) {
+        const prompt = inflight.prompt || "";
+        return [
+          { role: "user", content: prompt, attachments: [] },
+          { role: "assistant", content: full, attachments: [] },
+        ];
+      }
+      const copy = [...base];
+      const last = copy[copy.length - 1];
+      if (!last || last.role !== "assistant") {
+        copy.push({ role: "assistant", content: full, attachments: [] });
+        return copy;
+      }
+      copy[copy.length - 1] = { ...last, content: full };
+      return copy;
+    };
+    const next = update(inflight.messages);
+    writeInflight({ messages: next });
+    if (inflight.conversationId && conversationIdRef.current !== inflight.conversationId) return;
+    setMessages(update);
+  }
+
+  async function sendMessage(text, { forceNew = false } = {}) {
     const baseText = text || input.trim();
-    if ((!baseText && !attachments.length) || loading) return;
+    if (!baseText && !attachments.length) return;
+    if (loadingRef.current && !forceNew) return;
+
+    if (attachments.length && !isPremium) {
+      setAttachHint("Upgrade to Pro or Business to analyze a CSV, PDF, or photo in chat.");
+      return;
+    }
 
     const contentForHistory = baseText.trim();
     const messageAttachments = attachmentSummary.map((a) => ({
@@ -188,18 +332,53 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
             data: a.base64,
           },
         })),
+      ...attachments
+        .filter((a) => a.kind === "pdf" && a.base64)
+        .map((a) => ({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: a.base64,
+          },
+        })),
     ];
+    const csvBits = attachments
+      .filter((a) => a.kind === "csv" && a.text)
+      .map((a) => `\n\n--- CSV: ${a.name} ---\n${a.text}\n--- END CSV ---`);
+    if (csvBits.length) {
+      contentBlocks[0] = { type: "text", text: `${contentBlocks[0].text}${csvBits.join("")}` };
+    }
 
-    const nextMessages = [...messages, { role: "user", content: contentForHistory, attachments: messageAttachments }];
-    const nextMessagesForApi = toAnthropicMessages([...messages, { role: "user", content: contentBlocks }]);
-    // Create placeholder assistant message so we can stream into it.
-    setMessages([...nextMessages, { role: "assistant", content: "" }]);
+    const history = forceNew ? [] : messagesRef.current || [];
+    const nextMessages = [...history, { role: "user", content: contentForHistory, attachments: messageAttachments }];
+    const nextMessagesForApi = toAnthropicMessages([...history, { role: "user", content: contentBlocks }]);
+    const thread = [...nextMessages, { role: "assistant", content: "" }];
+    const generation = ++sendGenRef.current;
+
+    writeInflight({
+      conversationId: forceNew ? "" : conversationIdRef.current || "",
+      prompt: contentForHistory,
+      messages: thread,
+      loading: true,
+      generation,
+    });
+    if (forceNew) {
+      justCreatedIdRef.current = "";
+      conversationIdRef.current = "";
+      setConversationId("");
+      setConversationTitle("");
+    }
+    setMessages(thread);
     setInput("");
     setAttachments([]);
     setLoading(true);
-    let convoId = conversationId;
+
+    let convoId = forceNew ? "" : conversationIdRef.current;
     try {
-      convoId = await ensureValidConversationId(convoId, baseText || "New chat");
+      convoId = await ensureValidConversationId(convoId, baseText || "New chat", { forceNew });
+      if (generation !== inflight.generation) return;
+      if (convoId) writeInflight({ conversationId: convoId });
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "user", content: contentForHistory || "See attachments.", attachments: messageAttachments }]);
@@ -214,27 +393,15 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         messages: nextMessagesForApi,
         maxTokens: maxTokensByTier,
         onText: (_delta, full) => {
+          if (generation !== inflight.generation) return;
           finalText = full;
-          setMessages((current) => {
-            if (!current.length) return current;
-            const copy = [...current];
-            const last = copy[copy.length - 1];
-            if (!last || last.role !== "assistant") return copy;
-            copy[copy.length - 1] = { ...last, content: full };
-            return copy;
-          });
+          applyAssistantText(full, generation);
         },
       });
 
+      if (generation !== inflight.generation) return;
       const assistantContent = data.content?.[0]?.text || finalText || "Something went wrong.";
-      setMessages((current) => {
-        if (!current.length) return current;
-        const copy = [...current];
-        const last = copy[copy.length - 1];
-        if (!last || last.role !== "assistant") return copy;
-        copy[copy.length - 1] = { ...last, content: assistantContent, attachments: [] };
-        return copy;
-      });
+      applyAssistantText(assistantContent, generation);
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "assistant", content: assistantContent }]);
@@ -243,16 +410,9 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         }
       }
     } catch (error) {
+      if (generation !== inflight.generation) return;
       const assistantContent = error.message || "Request failed.";
-      setMessages((current) => {
-        // Replace placeholder assistant message if present, else append.
-        const copy = Array.isArray(current) ? [...current] : [];
-        if (copy.length && copy[copy.length - 1]?.role === "assistant") {
-          copy[copy.length - 1] = { role: "assistant", content: assistantContent, attachments: [] };
-          return copy;
-        }
-        return [...nextMessages, { role: "assistant", content: assistantContent, attachments: [] }];
-      });
+      applyAssistantText(assistantContent, generation);
       if (authToken && convoId) {
         try {
           await appendConversationMessages(authToken, convoId, [{ role: "assistant", content: assistantContent }]);
@@ -261,7 +421,10 @@ export default function ChatClientPage({ initialPrompt = "", initialConversation
         }
       }
     } finally {
-      setLoading(false);
+      if (generation === inflight.generation) {
+        setLoading(false);
+        writeInflight({ loading: false, messages: inflight.messages });
+      }
     }
   }
 
@@ -372,7 +535,7 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
       </div>
 
       <div className="chat-thread">
-        {messages.length ? (
+        {messages.length || loading ? (
           <div style={{ display: "grid", gap: "16px" }}>
             {messages.map((msg, i) => (
               <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
@@ -401,8 +564,8 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                                   style={{ width: "62px", height: "62px", borderRadius: "14px", objectFit: "cover", border: "1px solid rgba(15,13,10,0.18)" }}
                                 />
                               ) : (
-                                <div style={{ width: "62px", height: "62px", borderRadius: "14px", border: "1px solid rgba(15,13,10,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>
-                                  FILE
+                                <div style={{ width: "62px", height: "62px", borderRadius: "14px", border: "1px solid rgba(15,13,10,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11 }}>
+                                  {a.kind === "csv" ? "CSV" : a.kind === "pdf" ? "PDF" : "FILE"}
                                 </div>
                               )}
                             </div>
@@ -455,8 +618,8 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                             style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid var(--line)" }}
                           />
                         ) : (
-                          <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900 }}>
-                            FILE
+                          <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900, fontSize: 11 }}>
+                            {a.kind === "csv" ? "CSV" : a.kind === "pdf" ? "PDF" : "FILE"}
                           </div>
                         )}
                         <button
@@ -484,14 +647,17 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                   </div>
                 ) : null}
                 <div className="chat-composer surface-chrome" style={{ display: "flex", gap: "10px", alignItems: "center", border: "1px solid var(--line)", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
-                  <button
-                    type="button"
-                    aria-label="Add attachment"
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{ ...iconButtonStyle, cursor: "pointer" }}
-                  >
-                    +
-                  </button>
+                  <ChatAttachButton
+                    isPremium={isPremium}
+                    onPick={() => {
+                      if (!isPremium) {
+                        setAttachHint("Upgrade to Pro or Business to analyze a CSV, PDF, or photo in chat.");
+                        return;
+                      }
+                      setAttachHint("");
+                      fileInputRef.current?.click();
+                    }}
+                  />
                   <textarea
                     autoFocus
                     value={input}
@@ -539,6 +705,16 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                     ↑
                   </button>
                 </div>
+                {!attachments.length && !attachHint ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)", textAlign: "center" }}>
+                    {isPremium
+                      ? "Use + to attach a CSV, PDF, or photo of a report, invoice, or receipt."
+                      : "Document attach is on Pro and Business. Tap + for details."}
+                  </div>
+                ) : null}
+                {attachHint ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)", textAlign: "center" }}>{attachHint}</div>
+                ) : null}
                 {voiceError ? (
                   <div style={{ marginTop: 8, fontSize: 12, color: "var(--danger)", textAlign: "center" }}>{voiceError}</div>
                 ) : null}
@@ -551,18 +727,24 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        accept="image/*,.csv,text/csv,.pdf,application/pdf"
         style={{ display: "none" }}
         onChange={async (e) => {
           const files = Array.from(e.target.files || []);
           e.target.value = "";
           if (!files.length) return;
+          if (!isPremium) {
+            setAttachHint("Upgrade to Pro or Business to analyze a CSV, PDF, or photo in chat.");
+            return;
+          }
 
           const next = [];
           for (const file of files) {
             // Simple size guard to avoid huge base64 payloads.
-            if (file.size > 7 * 1024 * 1024) continue;
+            if (file.size > 10 * 1024 * 1024) continue;
             const id = `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(16).slice(2)}`;
+            const name = (file.name || "").toLowerCase();
+            const type = (file.type || "").toLowerCase();
             if (file.type?.startsWith("image/")) {
               const dataUrl = await readFileAsDataUrl(file).catch(() => "");
               const { base64, mediaType } = splitDataUrl(dataUrl);
@@ -575,6 +757,32 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                 previewUrl: URL.createObjectURL(file),
                 base64,
                 mediaType,
+              });
+            } else if (type === "text/csv" || name.endsWith(".csv")) {
+              const text = await file.text().catch(() => "");
+              next.push({
+                id,
+                kind: "csv",
+                name: file.name,
+                type: file.type || "text/csv",
+                size: file.size,
+                previewUrl: "",
+                base64: "",
+                mediaType: "text/csv",
+                text: String(text || "").slice(0, 80000),
+              });
+            } else if (type === "application/pdf" || name.endsWith(".pdf")) {
+              const dataUrl = await readFileAsDataUrl(file).catch(() => "");
+              const { base64 } = splitDataUrl(dataUrl);
+              next.push({
+                id,
+                kind: "pdf",
+                name: file.name,
+                type: "application/pdf",
+                size: file.size,
+                previewUrl: "",
+                base64,
+                mediaType: "application/pdf",
               });
             } else {
               next.push({
@@ -593,7 +801,7 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
         }}
       />
 
-      {messages.length ? (
+      {messages.length || loading ? (
         <>
           {attachments.length ? (
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -617,8 +825,8 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                       style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid var(--line)" }}
                     />
                   ) : (
-                    <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900 }}>
-                      FILE
+                    <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900, fontSize: 11 }}>
+                      {a.kind === "csv" ? "CSV" : a.kind === "pdf" ? "PDF" : "FILE"}
                     </div>
                   )}
                   <button
@@ -648,14 +856,17 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
 
           <div className="chat-composer-wrap is-docked">
             <div className="chat-composer surface-chrome" style={{ display: "flex", gap: "10px", alignItems: "center", border: "1px solid var(--line)", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
-              <button
-                type="button"
-                aria-label="Add attachment"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ ...iconButtonStyle, cursor: "pointer" }}
-              >
-                +
-              </button>
+              <ChatAttachButton
+                isPremium={isPremium}
+                onPick={() => {
+                  if (!isPremium) {
+                    setAttachHint("Upgrade to Pro or Business to analyze a CSV, PDF, or photo in chat.");
+                    return;
+                  }
+                  setAttachHint("");
+                  fileInputRef.current?.click();
+                }}
+              />
               <textarea
                 value={input}
                 onChange={(e) => {
@@ -702,6 +913,16 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                 ↑
               </button>
             </div>
+            {!attachments.length && !attachHint ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>
+                {isPremium
+                  ? "Use + to attach a CSV, PDF, or photo of a report, invoice, or receipt."
+                  : "Document attach is on Pro and Business. Tap + for details."}
+              </div>
+            ) : null}
+            {attachHint ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>{attachHint}</div>
+            ) : null}
             {voiceError ? (
               <div style={{ marginTop: 8, fontSize: 12, color: "var(--danger)", textAlign: "center" }}>{voiceError}</div>
             ) : null}
@@ -724,6 +945,64 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
           }
         }
       `}</style>
+    </div>
+  );
+}
+
+function ChatAttachButton({ isPremium, onPick }) {
+  const [hover, setHover] = useState(false);
+
+  const tip = isPremium
+    ? "Attach a CSV, PDF, or photo of a sales report, invoice, or receipt. Steady will read it."
+    : "Upgrade to Pro or Business to attach a CSV, PDF, or photo in chat.";
+
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <button
+        type="button"
+        aria-label="Attach a CSV, PDF, or photo"
+        aria-describedby={hover ? "steady-attach-tip" : undefined}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        onFocus={() => setHover(true)}
+        onBlur={() => setHover(false)}
+        onClick={onPick}
+        style={{
+          ...iconButtonStyle,
+          cursor: "pointer",
+          color: hover ? "var(--gold)" : "var(--ink-3)",
+        }}
+      >
+        +
+      </button>
+      {hover ? (
+        <div
+          id="steady-attach-tip"
+          role="tooltip"
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 10px)",
+            left: 0,
+            zIndex: 20,
+            width: 240,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid var(--gold-ring)",
+            background: "var(--bg-elev)",
+            boxShadow: "var(--shadow-sm)",
+            color: "var(--ink-2)",
+            fontSize: 12,
+            lineHeight: 1.45,
+            textAlign: "left",
+            pointerEvents: "none",
+          }}
+        >
+          <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 700, marginBottom: 4 }}>
+            Attach a document
+          </div>
+          {tip}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -781,6 +1060,16 @@ function toAnthropicMessages(msgs) {
             type: "image",
             source: { type: "base64", media_type: a.mediaType, data: a.base64 },
           });
+        } else if ((a?.kind === "pdf" || a?.mediaType === "application/pdf") && a?.base64) {
+          blocks.push({
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: a.base64 },
+          });
+        } else if (a?.kind === "csv" && a?.text) {
+          blocks[0] = {
+            type: "text",
+            text: `${blocks[0].text}\n\n--- CSV: ${a.name || "upload.csv"} ---\n${a.text}\n--- END CSV ---`,
+          };
         }
       }
       return { role: "user", content: blocks };

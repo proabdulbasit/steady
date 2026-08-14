@@ -15,7 +15,7 @@ const MessageSchema = new mongoose.Schema(
     attachments: {
       type: [
         {
-          kind: { type: String, enum: ["image", "file"], required: true },
+          kind: { type: String, enum: ["image", "file", "csv", "pdf"], required: true },
           name: { type: String, required: true },
           type: { type: String, default: "" },
           size: { type: Number, default: 0 },

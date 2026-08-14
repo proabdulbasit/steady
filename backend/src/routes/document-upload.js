@@ -7,13 +7,14 @@ const {
   analyzeUploadedDocument,
   sniffCsvKind,
   sniffImageKind,
+  sniffPdfKind,
 } = require("../lib/document-upload-analyze");
 
 const router = express.Router();
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 7 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
 });
 
 function multerSingle(req, res, next) {
@@ -21,7 +22,7 @@ function multerSingle(req, res, next) {
     if (!err) return next();
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({ error: "File is too large. Maximum size is 7 MB." });
+        return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
       }
       return res.status(400).json({ error: err.message || "Upload failed." });
     }
@@ -32,7 +33,7 @@ function multerSingle(req, res, next) {
 /**
  * POST /api/document-upload/analyze
  * multipart: file + optional note
- * Analyzes CSV or photo of a business document and returns Steady advice.
+ * Analyzes CSV, PDF, or photo of a business document and returns Steady advice.
  */
 router.post("/analyze", requireAuth, multerSingle, async (req, res) => {
   try {
@@ -48,7 +49,7 @@ router.post("/analyze", requireAuth, multerSingle, async (req, res) => {
     }
 
     if (!req.file) {
-      return res.status(400).json({ error: "Attach a CSV or photo as form field \"file\"." });
+      return res.status(400).json({ error: "Attach a CSV, PDF, or photo as form field \"file\"." });
     }
 
     const fileName = req.file.originalname || "upload";
@@ -58,9 +59,10 @@ router.post("/analyze", requireAuth, multerSingle, async (req, res) => {
     let kind = "auto";
     if (sniffCsvKind(fileName, mimeType)) kind = "csv";
     else if (sniffImageKind(fileName, mimeType)) kind = "image";
+    else if (sniffPdfKind(fileName, mimeType)) kind = "pdf";
     else {
       return res.status(400).json({
-        error: "Upload a CSV (.csv) or photo (JPG, PNG, GIF, WEBP) of a sales report, invoice, or expense sheet.",
+        error: "Upload a CSV (.csv), PDF, or photo (JPG, PNG, GIF, WEBP) of a sales report, invoice, or expense sheet.",
       });
     }
 
@@ -99,8 +101,9 @@ router.get("/capabilities", requireAuth, async (req, res) => {
     accept: {
       csv: [".csv", "text/csv"],
       images: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      pdf: ["application/pdf", ".pdf"],
     },
-    maxFileBytes: 7 * 1024 * 1024,
+    maxFileBytes: 10 * 1024 * 1024,
   });
 });
 

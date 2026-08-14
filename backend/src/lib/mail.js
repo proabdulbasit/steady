@@ -265,10 +265,36 @@ Open your dashboard: ${url}
   return sendTransactionalEmail({ to, subject, text, html });
 }
 
+async function sendOutcomeFollowUpEmail({ to, ownerName, context, chatUrl }) {
+  const url = chatUrl || `${getFrontendOrigin()}/chat`;
+  const about = String(context || "something Steady suggested").slice(0, 220);
+  const subject = "Quick check-in from Steady";
+  const text = `Hi ${ownerName || "there"},
+
+A couple weeks ago you asked about: "${about}"
+
+Did you try it? What happened? Your feedback helps Steady give you better advice.
+
+Open Steady: ${url}
+
+— Steady`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
+      <p>Hi ${escapeHtml(ownerName || "there")},</p>
+      <p>A couple weeks ago you asked about: <strong>${escapeHtml(about)}</strong></p>
+      <p>Did you try it? What happened? Your feedback helps Steady give you better advice.</p>
+      <p style="margin:24px 0;"><a href="${escapeHtml(url)}" style="display:inline-block;background:#c9a227;color:#1a1a1a;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:700;">Open Steady</a></p>
+    </div>
+  `.trim();
+
+  return sendTransactionalEmail({ to, subject, text, html });
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendDailyBriefingEmail,
   sendMailgunConnectivityTestEmail,
+  sendOutcomeFollowUpEmail,
   sendTransactionalEmail,
   resolveFromAddress,
 };

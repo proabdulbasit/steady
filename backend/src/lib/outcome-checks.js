@@ -8,8 +8,8 @@ function getFollowUpDueAt(from = new Date()) {
   if (Number.isFinite(minutes) && minutes > 0) {
     return new Date(from.getTime() + minutes * 60 * 1000);
   }
-  const days = Number(process.env.OUTCOME_FOLLOWUP_DAYS || 7);
-  const safeDays = Number.isFinite(days) && days > 0 ? days : 7;
+  const days = Number(process.env.OUTCOME_FOLLOWUP_DAYS || 14);
+  const safeDays = Number.isFinite(days) && days > 0 ? days : 14;
   return new Date(from.getTime() + safeDays * 24 * 60 * 60 * 1000);
 }
 
@@ -48,7 +48,7 @@ function serializeOutcome(doc) {
 }
 
 /**
- * Schedule (or refresh) a 7-day outcome checkup after Steady gives advice.
+ * Schedule (or refresh) a 14-day outcome checkup after Steady gives advice.
  */
 async function scheduleOutcomeCheck({
   userId,
@@ -117,10 +117,26 @@ async function listDueOutcomes(userId, { limit = 5 } = {}) {
   return items.map(serializeOutcome);
 }
 
+async function listPendingDueForEmail({ limit = 80 } = {}) {
+  const items = await OutcomeCheck.find({
+    status: "pending",
+    dueAt: { $lte: new Date() },
+    followUpEmailSentAt: null,
+  })
+    .sort({ dueAt: 1 })
+    .limit(limit)
+    .lean();
+  return items;
+}
+
+async function markFollowUpEmailSent(outcomeId) {
+  await OutcomeCheck.updateOne({ _id: outcomeId }, { $set: { followUpEmailSentAt: new Date() } });
+}
+
 async function respondToOutcome(userId, outcomeId, { status, note = "" } = {}) {
-  const allowed = new Set(["worked", "partially", "didnt_try", "dismissed"]);
+  const allowed = new Set(["worked", "partially", "didnt_work", "didnt_try", "dismissed"]);
   if (!allowed.has(status)) {
-    const err = new Error("Status must be worked, partially, didnt_try, or dismissed.");
+    const err = new Error("Status must be worked, partially, didnt_work, didnt_try, or dismissed.");
     err.status = 400;
     throw err;
   }
@@ -148,7 +164,7 @@ async function respondToOutcome(userId, outcomeId, { status, note = "" } = {}) {
 async function buildOutcomeMemoryBlock(userId, { limit = 8 } = {}) {
   const items = await OutcomeCheck.find({
     userId,
-    status: { $in: ["worked", "partially", "didnt_try"] },
+    status: { $in: ["worked", "partially", "didnt_work", "didnt_try"] },
   })
     .sort({ respondedAt: -1, updatedAt: -1 })
     .limit(limit)
@@ -158,7 +174,13 @@ async function buildOutcomeMemoryBlock(userId, { limit = 8 } = {}) {
 
   const lines = items.map((o) => {
     const label =
-      o.status === "worked" ? "worked" : o.status === "partially" ? "partially worked" : "didn't try";
+      o.status === "worked"
+        ? "worked"
+        : o.status === "partially"
+          ? "partially worked"
+          : o.status === "didnt_work"
+            ? "didn't work"
+            : "didn't try";
     const ask = o.userPromptExcerpt ? `Ask: ${o.userPromptExcerpt} · ` : "";
     const note = o.note ? ` · Owner note: ${o.note}` : "";
     return `- [${label}] ${ask}Advice: ${o.adviceExcerpt}${note}`;
@@ -175,6 +197,8 @@ module.exports = {
   serializeOutcome,
   scheduleOutcomeCheck,
   listDueOutcomes,
+  listPendingDueForEmail,
+  markFollowUpEmailSent,
   respondToOutcome,
   buildOutcomeMemoryBlock,
 };
