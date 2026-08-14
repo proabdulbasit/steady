@@ -20,12 +20,13 @@ const OutcomeCheckSchema = new mongoose.Schema(
     dueAt: { type: Date, required: true, index: true },
     status: {
       type: String,
-      enum: ["pending", "worked", "partially", "didnt_try", "dismissed"],
+      enum: ["pending", "worked", "partially", "didnt_work", "didnt_try", "dismissed"],
       default: "pending",
       index: true,
     },
     respondedAt: { type: Date, default: null },
     note: { type: String, default: "", trim: true },
+    followUpEmailSentAt: { type: Date, default: null, index: true },
   },
   { timestamps: true }
 );

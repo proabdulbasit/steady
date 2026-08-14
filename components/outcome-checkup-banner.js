@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSteady } from "./steady-provider";
 import {
+  buildDidntWorkFollowUpPrompt,
   buildPartialFollowUpPrompt,
   fetchDueOutcomes,
   respondToOutcome,
@@ -63,6 +64,7 @@ export function OutcomeCheckupBanner() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [happened, setHappened] = useState("");
 
   const refresh = useCallback(async () => {
     if (!authToken) return;
@@ -90,6 +92,7 @@ export function OutcomeCheckupBanner() {
 
   useEffect(() => {
     setExpanded(false);
+    setHappened("");
   }, [active?.id]);
 
   if (!isAuthenticated || !pathname || pathname.startsWith("/login") || pathname.startsWith("/register")) {
@@ -103,10 +106,11 @@ export function OutcomeCheckupBanner() {
     setBusy(status);
     setError("");
     try {
-      await respondToOutcome({ authToken, outcomeId: active.id, status });
+      await respondToOutcome({ authToken, outcomeId: active.id, status, note: happened });
       if (status === "partially") {
-        const prompt = buildPartialFollowUpPrompt(active);
-        router.push(chatPathWithPrompt(prompt));
+        router.push(chatPathWithPrompt(buildPartialFollowUpPrompt(active, happened)));
+      } else if (status === "didnt_work") {
+        router.push(chatPathWithPrompt(buildDidntWorkFollowUpPrompt(active, happened)));
       }
       await refresh();
     } catch (err) {
@@ -212,6 +216,14 @@ export function OutcomeCheckupBanner() {
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={Boolean(busy)}
+              onClick={() => handleRespond("didnt_work")}
+            >
+              {busy === "didnt_work" ? "…" : "Didn't work"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={Boolean(busy)}
               onClick={() => handleRespond("didnt_try")}
             >
               {busy === "didnt_try" ? "…" : "Didn't try"}
@@ -227,6 +239,24 @@ export function OutcomeCheckupBanner() {
             </button>
           </div>
         </div>
+
+        <input
+          value={happened}
+          onChange={(e) => setHappened(e.target.value.slice(0, 1000))}
+          placeholder="What happened? (optional — helps Steady give better advice)"
+          style={{
+            marginTop: 10,
+            width: "100%",
+            maxWidth: 640,
+            background: "var(--bg)",
+            border: "1px solid var(--line)",
+            borderRadius: 10,
+            padding: "8px 12px",
+            color: "var(--ink)",
+            fontFamily: "inherit",
+            fontSize: 13,
+          }}
+        />
 
         {error ? <div style={{ marginTop: 8, fontSize: 13, color: "var(--danger)" }}>{error}</div> : null}
       </div>

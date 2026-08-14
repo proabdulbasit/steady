@@ -55,8 +55,31 @@ router.get("/due", requireAuth, async (req, res) => {
     outcomes,
     followUpHint: process.env.OUTCOME_FOLLOWUP_MINUTES
       ? `${process.env.OUTCOME_FOLLOWUP_MINUTES} minute(s) (dev override)`
-      : `${process.env.OUTCOME_FOLLOWUP_DAYS || 7} day(s)`,
+      : `${process.env.OUTCOME_FOLLOWUP_DAYS || 14} day(s)`,
   });
+});
+
+/**
+ * Dev/test helper: send due follow-up emails immediately (does not wait for the daily UTC hour).
+ * Enabled when OUTCOME_ALLOW_FORCE_DUE=true (or always in non-production).
+ */
+router.post("/send-due-emails", requireAuth, async (req, res) => {
+  const allow =
+    process.env.OUTCOME_ALLOW_FORCE_DUE === "true" || process.env.NODE_ENV !== "production";
+  if (!allow) {
+    return res.status(403).json({ error: "send-due-emails is disabled." });
+  }
+  if (process.env.OUTCOME_FOLLOWUP_EMAIL_ENABLED !== "true") {
+    return res.status(400).json({ error: "Set OUTCOME_FOLLOWUP_EMAIL_ENABLED=true first." });
+  }
+  try {
+    const { runOutcomeFollowUpEmailCycle } = require("../integrations/outcome-followup-scheduler");
+    const summary = await runOutcomeFollowUpEmailCycle();
+    return res.json({ ok: true, ...summary });
+  } catch (error) {
+    const status = error.status || 500;
+    return res.status(status).json({ error: error.message || "Unable to send follow-up emails." });
+  }
 });
 
 /** Recent responded outcomes for AI memory injection. */

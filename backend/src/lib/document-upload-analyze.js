@@ -9,11 +9,11 @@ const ANTHROPIC_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "
 
 const DOCUMENT_SYSTEM = `You are Steady — a straight-talking AI co-pilot for small business owners (restaurants, auto shops, pawnshops, retail, and similar).
 
-The user uploaded a business document (sales CSV, expense sheet, invoice photo, receipt, etc.) because they may not have Square or QuickBooks connected yet.
+The user uploaded a business document (sales CSV, expense sheet, invoice photo, receipt, or PDF) because they may not have Square or QuickBooks connected yet.
 
 Rules:
 - Read the actual numbers / text from the document. Do not invent figures that are not present.
-- If the image or CSV is unclear, say what you can and cannot see.
+- If the image, CSV, or PDF is unclear, say what you can and cannot see.
 - Be specific: dollar amounts, % changes, line items, dates when visible.
 - Give practical advice they can use today — no corporate fluff.
 - Never claim this replaces a bookkeeper or accountant for tax filings.
@@ -41,6 +41,12 @@ function sniffCsvKind(fileName = "", mimeType = "") {
     return true;
   }
   return false;
+}
+
+function sniffPdfKind(fileName = "", mimeType = "") {
+  const mime = String(mimeType).toLowerCase();
+  const name = String(fileName).toLowerCase();
+  return mime === "application/pdf" || name.endsWith(".pdf");
 }
 
 function sniffImageKind(fileName = "", mimeType = "") {
@@ -90,7 +96,7 @@ function csvBufferToText(buffer) {
   };
 }
 
-async function callAnthropic({ system, userContent, maxTokens = 2000 }) {
+async function callAnthropic({ system, userContent, maxTokens = 2000, extraHeaders = {} }) {
   const apiKey = process.env.ANTHROPIC_API_KEY || "";
   if (!apiKey) {
     const err = new Error("Missing ANTHROPIC_API_KEY on the backend.");
@@ -104,6 +110,7 @@ async function callAnthropic({ system, userContent, maxTokens = 2000 }) {
       "content-type": "application/json",
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      ...extraHeaders,
     },
     body: JSON.stringify({
       model,
@@ -133,7 +140,7 @@ async function callAnthropic({ system, userContent, maxTokens = 2000 }) {
  * @param {string} opts.fileName
  * @param {string} opts.mimeType
  * @param {string} [opts.note]
- * @param {"csv"|"image"|"auto"} [opts.kind]
+ * @param {"csv"|"image"|"pdf"|"auto"} [opts.kind]
  */
 async function analyzeUploadedDocument({ user, buffer, fileName, mimeType, note = "", kind = "auto" }) {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) {
@@ -150,8 +157,9 @@ async function analyzeUploadedDocument({ user, buffer, fileName, mimeType, note 
   if (resolvedKind === "auto") {
     if (sniffCsvKind(fileName, mimeType)) resolvedKind = "csv";
     else if (sniffImageKind(fileName, mimeType)) resolvedKind = "image";
+    else if (sniffPdfKind(fileName, mimeType)) resolvedKind = "pdf";
     else {
-      const err = new Error("Upload a CSV (.csv) or photo (JPG, PNG, GIF, WEBP) of a business document.");
+      const err = new Error("Upload a CSV (.csv), PDF, or photo (JPG, PNG, GIF, WEBP) of a business document.");
       err.status = 400;
       throw err;
     }
@@ -164,6 +172,7 @@ async function analyzeUploadedDocument({ user, buffer, fileName, mimeType, note 
     byteSize: buffer.length,
   };
 
+  let extraHeaders = {};
   let userContent;
 
   if (resolvedKind === "csv") {
@@ -210,6 +219,26 @@ This photo is a business document (invoice, receipt, sales report, expense sheet
         },
       },
     ];
+  } else if (resolvedKind === "pdf") {
+    extraHeaders = { "anthropic-beta": "pdfs-2024-09-25" };
+    userContent = [
+      {
+        type: "text",
+        text: `Owner: ${ownerName}
+Industry: ${industry}
+File: ${fileName || "document.pdf"}
+${noteText ? `Owner note: ${noteText}\n` : ""}
+This PDF is a business document. Read what you can and give specific advice.`,
+      },
+      {
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: buffer.toString("base64"),
+        },
+      },
+    ];
   } else {
     const err = new Error("Unsupported document kind.");
     err.status = 400;
@@ -220,6 +249,7 @@ This photo is a business document (invoice, receipt, sales report, expense sheet
     system: DOCUMENT_SYSTEM,
     userContent,
     maxTokens: 2200,
+    extraHeaders,
   });
 
   if (!text?.trim()) {
@@ -239,6 +269,7 @@ module.exports = {
   analyzeUploadedDocument,
   sniffCsvKind,
   sniffImageKind,
+  sniffPdfKind,
   ANTHROPIC_IMAGE_TYPES,
   DOCUMENT_SYSTEM,
 };

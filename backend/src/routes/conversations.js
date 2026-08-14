@@ -187,7 +187,7 @@ router.post("/:id/messages", requireAuth, async (req, res) => {
   convo.messages.push(...messages);
   await convo.save();
 
-  // Outcome Memory Loop — schedule 7-day follow-up after actionable assistant advice.
+  // Outcome Memory Loop — schedule 14-day follow-up after actionable assistant advice.
   try {
     const assistantMsgs = messages.filter((m) => m.role === "assistant");
     if (assistantMsgs.length) {

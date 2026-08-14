@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { ALLOWED_INDUSTRY_IDS } = require("../lib/industries");
 
 const usageSchema = new mongoose.Schema(
   {
@@ -44,19 +45,7 @@ const userSchema = new mongoose.Schema(
     sessionIds: { type: [String], default: [] },
     industry: {
       type: String,
-      enum: [
-        "restaurant",
-        "pawnshop",
-        "auto_shop",
-        "retail",
-        "salon",
-        "cleaning",
-        "contractor",
-        "food_truck",
-        "landscaping",
-        "gym",
-        "other",
-      ],
+      enum: ALLOWED_INDUSTRY_IDS,
       default: "restaurant",
       index: true,
     },

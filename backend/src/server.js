@@ -11,6 +11,7 @@ const express = require("express");
 const { connectToDatabase } = require("./lib/db");
 const { startIntegrationScheduler } = require("./integrations/scheduler");
 const { startBriefingDeliveryScheduler } = require("./integrations/briefing-delivery-scheduler");
+const { startOutcomeFollowUpEmailScheduler } = require("./integrations/outcome-followup-scheduler");
 const billingRoutes = require("./routes/billing");
 const accessRoutes = require("./routes/access");
 const webhookRoutes = require("./routes/webhook");
@@ -66,6 +67,7 @@ connectToDatabase()
     });
     startIntegrationScheduler();
     startBriefingDeliveryScheduler();
+    startOutcomeFollowUpEmailScheduler();
   })
   .catch((error) => {
     console.error("Failed to connect to MongoDB", error);

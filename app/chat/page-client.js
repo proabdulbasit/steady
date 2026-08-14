@@ -63,6 +63,7 @@ export default function ChatClientPage() {
   const [conversationTitle, setConversationTitle] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [voiceError, setVoiceError] = useState("");
+  const [attachHint, setAttachHint] = useState("");
   const [voiceModeOpen, setVoiceModeOpen] = useState(false);
   const justCreatedIdRef = useRef("");
   const autoSentPromptRef = useRef("");
@@ -305,6 +306,11 @@ export default function ChatClientPage() {
     if (!baseText && !attachments.length) return;
     if (loadingRef.current && !forceNew) return;
 
+    if (attachments.length && !isPremium) {
+      setAttachHint("Upgrade to Pro or Business to analyze a CSV, PDF, or photo in chat.");
+      return;
+    }
+
     const contentForHistory = baseText.trim();
     const messageAttachments = attachmentSummary.map((a) => ({
       kind: a.kind,
@@ -326,7 +332,23 @@ export default function ChatClientPage() {
             data: a.base64,
           },
         })),
+      ...attachments
+        .filter((a) => a.kind === "pdf" && a.base64)
+        .map((a) => ({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: a.base64,
+          },
+        })),
     ];
+    const csvBits = attachments
+      .filter((a) => a.kind === "csv" && a.text)
+      .map((a) => `\n\n--- CSV: ${a.name} ---\n${a.text}\n--- END CSV ---`);
+    if (csvBits.length) {
+      contentBlocks[0] = { type: "text", text: `${contentBlocks[0].text}${csvBits.join("")}` };
+    }
 
     const history = forceNew ? [] : messagesRef.current || [];
     const nextMessages = [...history, { role: "user", content: contentForHistory, attachments: messageAttachments }];
@@ -542,8 +564,8 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                                   style={{ width: "62px", height: "62px", borderRadius: "14px", objectFit: "cover", border: "1px solid rgba(15,13,10,0.18)" }}
                                 />
                               ) : (
-                                <div style={{ width: "62px", height: "62px", borderRadius: "14px", border: "1px solid rgba(15,13,10,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>
-                                  FILE
+                                <div style={{ width: "62px", height: "62px", borderRadius: "14px", border: "1px solid rgba(15,13,10,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11 }}>
+                                  {a.kind === "csv" ? "CSV" : a.kind === "pdf" ? "PDF" : "FILE"}
                                 </div>
                               )}
                             </div>
@@ -596,8 +618,8 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                             style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid var(--line)" }}
                           />
                         ) : (
-                          <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900 }}>
-                            FILE
+                          <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900, fontSize: 11 }}>
+                            {a.kind === "csv" ? "CSV" : a.kind === "pdf" ? "PDF" : "FILE"}
                           </div>
                         )}
                         <button
@@ -625,14 +647,17 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                   </div>
                 ) : null}
                 <div className="chat-composer surface-chrome" style={{ display: "flex", gap: "10px", alignItems: "center", border: "1px solid var(--line)", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
-                  <button
-                    type="button"
-                    aria-label="Add attachment"
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{ ...iconButtonStyle, cursor: "pointer" }}
-                  >
-                    +
-                  </button>
+                  <ChatAttachButton
+                    isPremium={isPremium}
+                    onPick={() => {
+                      if (!isPremium) {
+                        setAttachHint("Upgrade to Pro or Business to analyze a CSV, PDF, or photo in chat.");
+                        return;
+                      }
+                      setAttachHint("");
+                      fileInputRef.current?.click();
+                    }}
+                  />
                   <textarea
                     autoFocus
                     value={input}
@@ -680,6 +705,16 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                     ↑
                   </button>
                 </div>
+                {!attachments.length && !attachHint ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)", textAlign: "center" }}>
+                    {isPremium
+                      ? "Use + to attach a CSV, PDF, or photo of a report, invoice, or receipt."
+                      : "Document attach is on Pro and Business. Tap + for details."}
+                  </div>
+                ) : null}
+                {attachHint ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)", textAlign: "center" }}>{attachHint}</div>
+                ) : null}
                 {voiceError ? (
                   <div style={{ marginTop: 8, fontSize: 12, color: "var(--danger)", textAlign: "center" }}>{voiceError}</div>
                 ) : null}
@@ -692,18 +727,24 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        accept="image/*,.csv,text/csv,.pdf,application/pdf"
         style={{ display: "none" }}
         onChange={async (e) => {
           const files = Array.from(e.target.files || []);
           e.target.value = "";
           if (!files.length) return;
+          if (!isPremium) {
+            setAttachHint("Upgrade to Pro or Business to analyze a CSV, PDF, or photo in chat.");
+            return;
+          }
 
           const next = [];
           for (const file of files) {
             // Simple size guard to avoid huge base64 payloads.
-            if (file.size > 7 * 1024 * 1024) continue;
+            if (file.size > 10 * 1024 * 1024) continue;
             const id = `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(16).slice(2)}`;
+            const name = (file.name || "").toLowerCase();
+            const type = (file.type || "").toLowerCase();
             if (file.type?.startsWith("image/")) {
               const dataUrl = await readFileAsDataUrl(file).catch(() => "");
               const { base64, mediaType } = splitDataUrl(dataUrl);
@@ -716,6 +757,32 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                 previewUrl: URL.createObjectURL(file),
                 base64,
                 mediaType,
+              });
+            } else if (type === "text/csv" || name.endsWith(".csv")) {
+              const text = await file.text().catch(() => "");
+              next.push({
+                id,
+                kind: "csv",
+                name: file.name,
+                type: file.type || "text/csv",
+                size: file.size,
+                previewUrl: "",
+                base64: "",
+                mediaType: "text/csv",
+                text: String(text || "").slice(0, 80000),
+              });
+            } else if (type === "application/pdf" || name.endsWith(".pdf")) {
+              const dataUrl = await readFileAsDataUrl(file).catch(() => "");
+              const { base64 } = splitDataUrl(dataUrl);
+              next.push({
+                id,
+                kind: "pdf",
+                name: file.name,
+                type: "application/pdf",
+                size: file.size,
+                previewUrl: "",
+                base64,
+                mediaType: "application/pdf",
               });
             } else {
               next.push({
@@ -758,8 +825,8 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                       style={{ width: "56px", height: "56px", borderRadius: "14px", objectFit: "cover", border: "1px solid var(--line)" }}
                     />
                   ) : (
-                    <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900 }}>
-                      FILE
+                    <div style={{ width: "56px", height: "56px", borderRadius: "14px", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", fontWeight: 900, fontSize: 11 }}>
+                      {a.kind === "csv" ? "CSV" : a.kind === "pdf" ? "PDF" : "FILE"}
                     </div>
                   )}
                   <button
@@ -789,14 +856,17 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
 
           <div className="chat-composer-wrap is-docked">
             <div className="chat-composer surface-chrome" style={{ display: "flex", gap: "10px", alignItems: "center", border: "1px solid var(--line)", borderRadius: "999px", padding: "8px 10px 8px 14px" }}>
-              <button
-                type="button"
-                aria-label="Add attachment"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ ...iconButtonStyle, cursor: "pointer" }}
-              >
-                +
-              </button>
+              <ChatAttachButton
+                isPremium={isPremium}
+                onPick={() => {
+                  if (!isPremium) {
+                    setAttachHint("Upgrade to Pro or Business to analyze a CSV, PDF, or photo in chat.");
+                    return;
+                  }
+                  setAttachHint("");
+                  fileInputRef.current?.click();
+                }}
+              />
               <textarea
                 value={input}
                 onChange={(e) => {
@@ -843,6 +913,16 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
                 ↑
               </button>
             </div>
+            {!attachments.length && !attachHint ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>
+                {isPremium
+                  ? "Use + to attach a CSV, PDF, or photo of a report, invoice, or receipt."
+                  : "Document attach is on Pro and Business. Tap + for details."}
+              </div>
+            ) : null}
+            {attachHint ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>{attachHint}</div>
+            ) : null}
             {voiceError ? (
               <div style={{ marginTop: 8, fontSize: 12, color: "var(--danger)", textAlign: "center" }}>{voiceError}</div>
             ) : null}
@@ -865,6 +945,64 @@ VOICE MODE: Keep answers short and spoken — 2 to 4 short sentences when possib
           }
         }
       `}</style>
+    </div>
+  );
+}
+
+function ChatAttachButton({ isPremium, onPick }) {
+  const [hover, setHover] = useState(false);
+
+  const tip = isPremium
+    ? "Attach a CSV, PDF, or photo of a sales report, invoice, or receipt. Steady will read it."
+    : "Upgrade to Pro or Business to attach a CSV, PDF, or photo in chat.";
+
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <button
+        type="button"
+        aria-label="Attach a CSV, PDF, or photo"
+        aria-describedby={hover ? "steady-attach-tip" : undefined}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        onFocus={() => setHover(true)}
+        onBlur={() => setHover(false)}
+        onClick={onPick}
+        style={{
+          ...iconButtonStyle,
+          cursor: "pointer",
+          color: hover ? "var(--gold)" : "var(--ink-3)",
+        }}
+      >
+        +
+      </button>
+      {hover ? (
+        <div
+          id="steady-attach-tip"
+          role="tooltip"
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 10px)",
+            left: 0,
+            zIndex: 20,
+            width: 240,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid var(--gold-ring)",
+            background: "var(--bg-elev)",
+            boxShadow: "var(--shadow-sm)",
+            color: "var(--ink-2)",
+            fontSize: 12,
+            lineHeight: 1.45,
+            textAlign: "left",
+            pointerEvents: "none",
+          }}
+        >
+          <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 700, marginBottom: 4 }}>
+            Attach a document
+          </div>
+          {tip}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -922,6 +1060,16 @@ function toAnthropicMessages(msgs) {
             type: "image",
             source: { type: "base64", media_type: a.mediaType, data: a.base64 },
           });
+        } else if ((a?.kind === "pdf" || a?.mediaType === "application/pdf") && a?.base64) {
+          blocks.push({
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: a.base64 },
+          });
+        } else if (a?.kind === "csv" && a?.text) {
+          blocks[0] = {
+            type: "text",
+            text: `${blocks[0].text}\n\n--- CSV: ${a.name || "upload.csv"} ---\n${a.text}\n--- END CSV ---`,
+          };
         }
       }
       return { role: "user", content: blocks };

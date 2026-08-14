@@ -9,8 +9,8 @@ import { useSteady } from "../../../components/steady-provider";
 import { analyzeDocumentUpload } from "../../../lib/document-upload-client";
 import { scheduleOutcome } from "../../../lib/outcomes-client";
 
-const ACCEPT = ".csv,text/csv,image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp";
-const MAX_BYTES = 7 * 1024 * 1024;
+const ACCEPT = ".csv,text/csv,application/pdf,.pdf,image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp";
+const MAX_BYTES = 10 * 1024 * 1024;
 
 function formatBytes(n) {
   if (!n && n !== 0) return "";
@@ -24,6 +24,9 @@ function classifyFile(file) {
   const type = (file?.type || "").toLowerCase();
   if (name.endsWith(".csv") || type === "text/csv" || type === "application/vnd.ms-excel") {
     return "csv";
+  }
+  if (type === "application/pdf" || name.endsWith(".pdf")) {
+    return "pdf";
   }
   if (type.startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(name)) {
     return "image";
@@ -75,13 +78,13 @@ export default function DocumentUploadPage() {
     if (!next) return;
 
     if (next.size > MAX_BYTES) {
-      setError("File is too large. Maximum size is 7 MB.");
+      setError("File is too large. Maximum size is 10 MB.");
       return;
     }
 
     const nextKind = classifyFile(next);
     if (!nextKind) {
-      setError("Upload a CSV (.csv) or photo (JPG, PNG, GIF, WEBP).");
+      setError("Upload a CSV (.csv), PDF, or photo (JPG, PNG, GIF, WEBP).");
       return;
     }
 
@@ -93,7 +96,7 @@ export default function DocumentUploadPage() {
     if (nextKind === "image") {
       setPreviewUrl(URL.createObjectURL(next));
       setCsvPreview("");
-    } else {
+    } else if (nextKind === "csv") {
       setPreviewUrl("");
       try {
         const text = await next.text();
@@ -102,6 +105,9 @@ export default function DocumentUploadPage() {
       } catch {
         setCsvPreview("(Could not preview CSV text)");
       }
+    } else {
+      setPreviewUrl("");
+      setCsvPreview("");
     }
   }
 
@@ -114,7 +120,7 @@ export default function DocumentUploadPage() {
 
   async function handleAnalyze() {
     if (!file) {
-      setError("Choose a CSV or photo first.");
+      setError("Choose a CSV, PDF, or photo first.");
       return;
     }
     if (!isPremium) {
@@ -146,7 +152,7 @@ export default function DocumentUploadPage() {
     return (
       <PageShell
         eyebrow="Tool"
-        title="CSV & Photo Upload"
+        title="CSV, PDF & Photo Upload"
         description="Loading…"
       />
     );
@@ -154,10 +160,10 @@ export default function DocumentUploadPage() {
 
   return (
     <PageShell
-      eyebrow="Tool"
-      title="CSV & Photo Upload"
-      description="Photograph or upload a sales report, invoice, or expense sheet. Steady reads the real numbers and gives specific advice — no Square or QuickBooks connection required."
-    >
+        eyebrow="Tool"
+        title="CSV, PDF & Photo Upload"
+        description="Photograph or upload a sales report, invoice, PDF, or expense sheet. Steady reads the real numbers and gives specific advice — no Square or QuickBooks connection required."
+      >
       {!isPremium && (
         <div style={upgradeBanner}>
           <div>
@@ -182,7 +188,7 @@ export default function DocumentUploadPage() {
               Add your document
             </h2>
             <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--ink-3)", lineHeight: 1.55 }}>
-              Drop a CSV export or snap a photo of a printed report, invoice, or receipt.
+              Drop a CSV, PDF, or snap a photo of a printed report, invoice, or receipt.
             </p>
           </div>
 
@@ -216,10 +222,10 @@ export default function DocumentUploadPage() {
               ↑
             </div>
             <div style={{ fontSize: 15, color: "var(--ink)", fontWeight: 600, marginBottom: 6 }}>
-              Drag & drop CSV or photo
+              Drag & drop CSV, PDF, or photo
             </div>
             <div style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 18 }}>
-              CSV · JPG · PNG · GIF · WEBP · max 7 MB
+              CSV · PDF · JPG · PNG · GIF · WEBP · max 10 MB
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
               <GoldButton type="button" onClick={() => fileInputRef.current?.click()} disabled={loading}>

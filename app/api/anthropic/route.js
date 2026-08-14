@@ -3,6 +3,13 @@ import { getPrompt } from "../../../lib/industry-prompts";
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
 
+function messagesHavePdf(body) {
+  const msgs = Array.isArray(body?.messages) ? body.messages : [];
+  return msgs.some((m) =>
+    Array.isArray(m?.content) && m.content.some((b) => b?.type === "document")
+  );
+}
+
 async function requestAnthropic(apiKey, body) {
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -10,6 +17,7 @@ async function requestAnthropic(apiKey, body) {
       "content-type": "application/json",
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      ...(messagesHavePdf(body) ? { "anthropic-beta": "pdfs-2024-09-25" } : {}),
     },
     body: JSON.stringify(body),
   });
@@ -33,6 +41,7 @@ async function requestAnthropicStream(apiKey, body) {
       accept: "text/event-stream",
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      ...(messagesHavePdf(body) ? { "anthropic-beta": "pdfs-2024-09-25" } : {}),
     },
     body: JSON.stringify({ ...body, stream: true }),
   });
@@ -143,7 +152,7 @@ export async function POST(req) {
   }
 
   const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
-  const industry = access.data?.user?.industry || "restaurant";
+  const industry = access.data?.user?.industry || "other";
   const industrySystem = getPrompt(industry);
   const extraSystem = typeof body.system === "string" ? body.system : "";
   const outcomeMemory = await fetchOutcomeMemoryBlock(authToken);

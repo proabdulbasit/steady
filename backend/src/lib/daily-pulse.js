@@ -23,6 +23,7 @@ function serializePulse(doc) {
     dayOfWeek: o.dayOfWeek,
     weekday: WEEKDAYS[o.dayOfWeek] || "",
     level: o.level,
+    note: o.note || "",
     patternKey: o.patternKey || "",
     patternMessage: o.patternMessage || "",
     patternDismissedAt: o.patternDismissedAt || null,
@@ -130,7 +131,7 @@ async function listRecentPulses(userId, { limit = 60 } = {}) {
   return items.map(serializePulse);
 }
 
-async function logDailyPulse(userId, { dateKey, level }) {
+async function logDailyPulse(userId, { dateKey, level, note = "" }) {
   if (!LEVELS.has(level)) {
     const err = new Error("Level must be busy, normal, or slow.");
     err.status = 400;
@@ -142,6 +143,8 @@ async function logDailyPulse(userId, { dateKey, level }) {
     throw err;
   }
 
+  const noteText = typeof note === "string" ? note.trim().slice(0, 280) : "";
+
   const dayOfWeek = dayOfWeekFromDateKey(dateKey);
 
   // Upsert today's pulse (allow changing mind same day).
@@ -149,8 +152,9 @@ async function logDailyPulse(userId, { dateKey, level }) {
   if (doc) {
     doc.level = level;
     doc.dayOfWeek = dayOfWeek;
+    if (noteText) doc.note = noteText;
   } else {
-    doc = new DailyPulse({ userId, dateKey, dayOfWeek, level });
+    doc = new DailyPulse({ userId, dateKey, dayOfWeek, level, note: noteText });
   }
 
   // Detect pattern using recent history + this level.
@@ -173,7 +177,7 @@ async function logDailyPulse(userId, { dateKey, level }) {
 
   await doc.save();
 
-  const history = await listRecentPulses(userId, { limit: 14 });
+  const history = await listRecentPulses(userId, { limit: 30 });
   return {
     pulse: serializePulse(doc),
     pattern: pattern
@@ -206,7 +210,8 @@ async function buildPulseMemoryBlock(userId) {
 
   const lines = items.map((p) => {
     const day = WEEKDAYS[p.dayOfWeek] || "?";
-    return `- ${p.dateKey} (${day}): ${p.level}`;
+    const note = typeof p.note === "string" && p.note.trim() ? ` — ${p.note.trim().slice(0, 80)}` : "";
+    return `- ${p.dateKey} (${day}): ${p.level}${note}`;
   });
 
   const openPattern = items.find((p) => p.patternKey && !p.patternDismissedAt);

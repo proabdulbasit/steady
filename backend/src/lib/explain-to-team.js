@@ -4,19 +4,19 @@
 
 const EXPLAIN_TO_TEAM_SYSTEM = `You rewrite business advice for a small-business owner to share with their staff.
 
+Start with exactly: "Starting tomorrow, here's what we're doing differently:"
+
 Rules:
-- Plain, simple language a cook, cashier, tech, or front-desk person understands immediately.
+- Extremely simple language a cook, cashier, technician, or cleaner understands immediately.
 - No jargon. No corporate speak. No buzzwords.
-- Short sentences. Clear instructions they can follow today.
+- Write as if talking directly to a frontline employee, not management.
+- Be specific about exactly what they should DO differently starting tomorrow.
+- Keep it short — employees won't read a novel.
+- Friendly but direct.
+- Format as a simple numbered list of actions.
 - Keep the important facts and numbers from the original advice.
 - Do not add new strategies that were not in the original.
-- Write in second person to the team ("Please…", "Starting today…") OR as a short staff note from the owner.
-- Output ONLY the staff-ready message. No preamble like "Here's a rewrite".
-
-Structure:
-1) One short opening line: what this is about
-2) Clear bullet or numbered steps (what to do)
-3) Optional closing line: why it matters / who to ask if stuck`;
+- Output ONLY the staff-ready message. No preamble like "Here's a rewrite".`;
 
 async function callAnthropic({ system, userContent, maxTokens = 1200 }) {
   const apiKey = process.env.ANTHROPIC_API_KEY || "";
