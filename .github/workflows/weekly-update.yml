@@ -32,9 +32,10 @@ jobs:
       MONGODB_DB: ${{ vars.MONGODB_DB }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GROQ_WEEKLY_API_KEY: ${{ secrets.GROQ_WEEKLY_API_KEY }}
-      GROQ_RESEARCH_MODEL: ${{ vars.GROQ_RESEARCH_MODEL || 'groq/compound' }}
+      GROQ_RESEARCH_MODEL: ${{ vars.GROQ_RESEARCH_MODEL || 'groq/compound-mini' }}
       GROQ_CONTENT_MODEL: ${{ vars.GROQ_CONTENT_MODEL || 'openai/gpt-oss-120b' }}
       GROQ_FALLBACK_MODEL: ${{ vars.GROQ_FALLBACK_MODEL || 'openai/gpt-oss-20b' }}
+      GROQ_RETRY_WAIT_MS: "65000"
       SITE_BASE_URL: ${{ vars.SITE_BASE_URL || 'https://worksteady.app' }}
       MAX_KEYWORD_OPPORTUNITIES: ${{ vars.MAX_KEYWORD_OPPORTUNITIES || '8' }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}

@@ -4,6 +4,30 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function durationToMs(value) {
+  const match = String(value || "")
+    .trim()
+    .match(/([\d.]+)\s*(ms|s|m)?/i);
+  if (!match) return 0;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return 0;
+  const unit = (match[2] || "s").toLowerCase();
+  if (unit === "ms") return Math.ceil(amount);
+  if (unit === "m") return Math.ceil(amount * 60000);
+  return Math.ceil(amount * 1000);
+}
+
+function retryAfterMs(response, message = "") {
+  const retryAfter = response.headers.get("retry-after");
+  const tokenReset = response.headers.get("x-ratelimit-reset-tokens");
+  const messageMatch = String(message).match(/try again in\s+([\d.]+\s*(?:ms|s|m))/i);
+  return Math.max(
+    durationToMs(retryAfter),
+    durationToMs(tokenReset),
+    durationToMs(messageMatch?.[1])
+  );
+}
+
 function parseJsonResponse(value) {
   if (value && typeof value === "object") return value;
   const text = String(value || "").trim();
@@ -54,7 +78,7 @@ class GroqClient {
       (options.weekly ? process.env.GROQ_WEEKLY_API_KEY : "") ||
       process.env.GROQ_API_KEY;
     this.researchModel =
-      options.researchModel || process.env.GROQ_RESEARCH_MODEL || "groq/compound";
+      options.researchModel || process.env.GROQ_RESEARCH_MODEL || "groq/compound-mini";
     this.contentModel =
       options.contentModel || process.env.GROQ_CONTENT_MODEL || "openai/gpt-oss-120b";
     this.fallbackModel =
@@ -62,6 +86,15 @@ class GroqClient {
     this.fetch = options.fetch || global.fetch;
     this.maxRetries = options.maxRetries ?? 3;
     this.timeoutMs = options.timeoutMs ?? 120000;
+    const configuredRateLimitWait = Number.parseInt(
+      process.env.GROQ_RETRY_WAIT_MS || "65000",
+      10
+    );
+    this.rateLimitWaitMs =
+      options.rateLimitWaitMs ??
+      (Number.isFinite(configuredRateLimitWait)
+        ? Math.max(1000, configuredRateLimitWait)
+        : 65000);
     if (!this.apiKey) throw new Error("Missing GROQ_API_KEY.");
     if (typeof this.fetch !== "function") throw new Error("Native fetch is unavailable.");
   }
@@ -92,12 +125,12 @@ class GroqClient {
         });
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
+          const message = body.error?.message || response.statusText;
           const error = new Error(
-            `Groq request failed (${response.status}): ${
-              body.error?.message || response.statusText
-            }`
+            `Groq request failed (${response.status}): ${message}`
           );
           error.status = response.status;
+          error.retryAfterMs = retryAfterMs(response, message);
           throw error;
         }
         const content = body.choices?.[0]?.message?.content;
@@ -129,7 +162,11 @@ class GroqClient {
           error.status >= 500;
         if (!retryable || attempt === this.maxRetries) break;
         const jitter = Math.floor(Math.random() * 250);
-        await sleep(750 * 2 ** attempt + jitter);
+        const waitMs =
+          error.status === 429
+            ? Math.max(this.rateLimitWaitMs, error.retryAfterMs || 0) + jitter
+            : 750 * 2 ** attempt + jitter;
+        await sleep(waitMs);
       } finally {
         clearTimeout(timer);
       }
@@ -172,5 +209,7 @@ module.exports = {
   GROQ_ENDPOINT,
   GroqClient,
   compactMessages,
+  durationToMs,
   parseJsonResponse,
+  retryAfterMs,
 };
