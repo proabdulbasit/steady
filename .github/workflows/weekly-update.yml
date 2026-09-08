@@ -36,7 +36,7 @@ jobs:
       GROQ_CONTENT_MODEL: ${{ vars.GROQ_CONTENT_MODEL || 'openai/gpt-oss-120b' }}
       GROQ_FALLBACK_MODEL: ${{ vars.GROQ_FALLBACK_MODEL || 'openai/gpt-oss-20b' }}
       SITE_BASE_URL: ${{ vars.SITE_BASE_URL || 'https://worksteady.app' }}
-      MAX_KEYWORD_OPPORTUNITIES: ${{ vars.MAX_KEYWORD_OPPORTUNITIES || '24' }}
+      MAX_KEYWORD_OPPORTUNITIES: ${{ vars.MAX_KEYWORD_OPPORTUNITIES || '8' }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
 
     steps:

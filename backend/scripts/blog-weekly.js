@@ -15,8 +15,8 @@ const { GroqClient } = require("../src/lib/blog/groq");
 const { duplicateScore, normalizeText } = require("../src/lib/blog/duplicate");
 
 function maxOpportunities() {
-  const parsed = Number.parseInt(process.env.MAX_KEYWORD_OPPORTUNITIES || "24", 10);
-  return Math.min(50, Math.max(1, Number.isFinite(parsed) ? parsed : 24));
+  const parsed = Number.parseInt(process.env.MAX_KEYWORD_OPPORTUNITIES || "8", 10);
+  return Math.min(8, Math.max(1, Number.isFinite(parsed) ? parsed : 8));
 }
 
 function normalizeOpportunity(item, postsBySlug) {
@@ -91,33 +91,23 @@ async function runWeekly(options = {}) {
     const [posts, opportunities] = await Promise.all([
       BlogPost.find({ status: { $in: ["published", "needs_review", "draft"] } })
         .select("_id title slug excerpt primaryKeyword category updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(80)
         .lean(),
       KeywordOpportunity.find({
         status: { $in: ["approved", "processing", "needs_review", "published"] },
       })
         .select("keyword normalizedKeyword type status existingPostId mergePostIds")
+        .sort({ updatedAt: -1 })
+        .limit(120)
         .lean(),
     ]);
-    const research = await groq.research(`Research current, evidence-backed content opportunities for WorkSteady,
-a small-business operations product. Focus on practical revenue, cost, staffing,
-workflow, and daily decision-making problems. Identify new topics and posts that
-need updating or consolidating. Do not claim access to keyword volume, traffic,
-rankings, or proprietary SEO metrics.
-
-Existing posts:
-${JSON.stringify(posts)}
-
-Existing opportunities:
-${JSON.stringify(opportunities)}
-
-Provide citations to reliable HTTPS sources and explain why each topic matters
-to small-business operators.`);
     const structured = await groq.json(
       [
         {
           role: "system",
           content:
-            "Turn cited research into strict JSON. Never invent search-volume, traffic, ranking, or customer data.",
+            "Use web search to research current, evidence-backed content opportunities for WorkSteady, then return strict JSON. Cite reliable primary HTTPS sources. Never invent search-volume, traffic, ranking, customer, or product data.",
         },
         {
           role: "user",
@@ -127,11 +117,19 @@ existingPostSlug (required for update/consolidate), consolidatePostSlugs
 (required for consolidate and containing the competing posts to merge), searchIntent, cluster,
 secondaryKeywords, questions, rationale, businessRelevance (0-100 based only
 on fit with small-business operations), and evidence [{title,url,publisher}].
-Avoid duplicates of existing opportunities. Research:
-${research.content}`,
+Focus on practical revenue, cost, staffing, workflow, and daily decision-making
+problems for small-business operators. Identify new topics and posts that need
+updating or consolidating. Avoid duplicates of the supplied posts and
+opportunities.
+
+Existing posts:
+${JSON.stringify(posts)}
+
+Existing opportunities:
+${JSON.stringify(opportunities)}`,
         },
       ],
-      { temperature: 0.1, maxTokens: 3500 }
+      { research: true, temperature: 0.1, maxTokens: 2500 }
     );
     const postsBySlug = new Map(posts.map((post) => [post.slug, post]));
     const queuedKeywords = new Set(
@@ -194,7 +192,7 @@ ${research.content}`,
       run.completedAt = new Date();
       run.counts.researched = candidates.length;
       run.metadata.saved = saved;
-      run.metadata.researchModel = research.model;
+      run.metadata.researchModel = structured.model;
       await run.save();
     }
     return { dryRun, researched: candidates.length, saved, candidates };

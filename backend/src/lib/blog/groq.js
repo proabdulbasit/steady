@@ -111,10 +111,13 @@ class GroqClient {
       } catch (error) {
         lastError = error;
         if (error.status === 413 && !options.compactAttempt) {
-          return this.chat(compactMessages(messages), {
+          return this.chat(compactMessages(messages, 8000), {
             ...options,
             model,
-            maxTokens: Math.min(options.maxTokens ?? 8000, 3000),
+            maxTokens: Math.min(
+              options.maxTokens ?? 8000,
+              options.research ? 1800 : 2600
+            ),
             compactAttempt: true,
           });
         }

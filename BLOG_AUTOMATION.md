@@ -26,7 +26,7 @@ and GitHub repository settings.
 - `GROQ_RESEARCH_MODEL`: defaults to `groq/compound` for cited web research.
 - `GROQ_CONTENT_MODEL`: defaults to `openai/gpt-oss-120b`.
 - `GROQ_FALLBACK_MODEL`: defaults to `openai/gpt-oss-20b`.
-- `MAX_KEYWORD_OPPORTUNITIES`: maximum weekly suggestions; default is 24.
+- `MAX_KEYWORD_OPPORTUNITIES`: maximum weekly suggestions; capped at 8 to keep research requests reliable.
 - `BLOG_REVALIDATE_URL`: defaults to the production revalidation endpoint.
 
 Configure the same applicable values in the backend deployment. Configure
