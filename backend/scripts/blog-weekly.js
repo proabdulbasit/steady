@@ -129,7 +129,12 @@ Existing opportunities:
 ${JSON.stringify(opportunities)}`,
         },
       ],
-      { research: true, temperature: 0.1, maxTokens: 2500 }
+      {
+        research: true,
+        webSearch: true,
+        temperature: 0.1,
+        maxTokens: 2500,
+      }
     );
     const postsBySlug = new Map(posts.map((post) => [post.slug, post]));
     const queuedKeywords = new Set(

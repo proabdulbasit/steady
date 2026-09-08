@@ -78,7 +78,9 @@ class GroqClient {
       (options.weekly ? process.env.GROQ_WEEKLY_API_KEY : "") ||
       process.env.GROQ_API_KEY;
     this.researchModel =
-      options.researchModel || process.env.GROQ_RESEARCH_MODEL || "groq/compound-mini";
+      options.researchModel ||
+      process.env.GROQ_RESEARCH_MODEL ||
+      "openai/gpt-oss-20b";
     this.contentModel =
       options.contentModel || process.env.GROQ_CONTENT_MODEL || "openai/gpt-oss-120b";
     this.fallbackModel =
@@ -120,6 +122,9 @@ class GroqClient {
             temperature: options.temperature ?? 0.2,
             max_completion_tokens: options.maxTokens ?? 8000,
             ...(options.json ? { response_format: { type: "json_object" } } : {}),
+            ...(options.webSearch
+              ? { tools: [{ type: "browser_search" }] }
+              : {}),
           }),
           signal: controller.signal,
         });
@@ -200,7 +205,12 @@ class GroqClient {
         },
         { role: "user", content: prompt },
       ],
-      { research: true, temperature: 0.1, maxTokens: 3500 }
+      {
+        research: true,
+        webSearch: true,
+        temperature: 0.1,
+        maxTokens: 2500,
+      }
     );
   }
 }

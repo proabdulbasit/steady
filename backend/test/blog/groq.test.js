@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  GroqClient,
   compactMessages,
   durationToMs,
   retryAfterMs,
@@ -25,4 +26,28 @@ test("Groq retry timing understands rate-limit headers and messages", () => {
   };
   assert.equal(durationToMs("2m"), 120000);
   assert.equal(retryAfterMs(response, "Please try again in 376ms"), 1500);
+});
+
+test("research uses GPT-OSS browser search instead of Compound", async () => {
+  let requestBody;
+  const client = new GroqClient({
+    apiKey: "test-key",
+    researchModel: "openai/gpt-oss-20b",
+    maxRetries: 0,
+    fetch: async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return new Response(
+        JSON.stringify({
+          model: "openai/gpt-oss-20b",
+          choices: [{ message: { content: "Grounded research" } }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    },
+  });
+
+  await client.research("Find a current small-business operations topic.");
+
+  assert.equal(requestBody.model, "openai/gpt-oss-20b");
+  assert.deepEqual(requestBody.tools, [{ type: "browser_search" }]);
 });

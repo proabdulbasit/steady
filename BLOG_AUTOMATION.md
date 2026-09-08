@@ -23,7 +23,7 @@ and GitHub repository settings.
 
 - `SITE_BASE_URL`: production origin; default is `https://worksteady.app`.
 - `MONGODB_DB`: optional database name when it is not included in `MONGODB_URI`.
-- `GROQ_RESEARCH_MODEL`: defaults to `groq/compound-mini` for cited web research within Groq rate limits.
+- `GROQ_RESEARCH_MODEL`: defaults to `openai/gpt-oss-20b` with Groq browser search for cited research.
 - `GROQ_CONTENT_MODEL`: defaults to `openai/gpt-oss-120b`.
 - `GROQ_FALLBACK_MODEL`: defaults to `openai/gpt-oss-20b`.
 - `MAX_KEYWORD_OPPORTUNITIES`: maximum weekly suggestions; capped at 8 to keep research requests reliable.
