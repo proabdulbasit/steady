@@ -51,3 +51,31 @@ test("research uses GPT-OSS browser search instead of Compound", async () => {
   assert.equal(requestBody.model, "openai/gpt-oss-20b");
   assert.deepEqual(requestBody.tools, [{ type: "browser_search" }]);
 });
+
+test("browser-search JSON requests omit Groq's incompatible response format", async () => {
+  let requestBody;
+  const client = new GroqClient({
+    apiKey: "test-key",
+    researchModel: "openai/gpt-oss-20b",
+    maxRetries: 0,
+    fetch: async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return new Response(
+        JSON.stringify({
+          model: "openai/gpt-oss-20b",
+          choices: [{ message: { content: '{"opportunities":[]}' } }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    },
+  });
+
+  const result = await client.json(
+    [{ role: "user", content: "Research and return JSON." }],
+    { research: true, webSearch: true }
+  );
+
+  assert.deepEqual(requestBody.tools, [{ type: "browser_search" }]);
+  assert.equal(requestBody.response_format, undefined);
+  assert.deepEqual(result.data, { opportunities: [] });
+});

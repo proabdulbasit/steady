@@ -191,7 +191,12 @@ class GroqClient {
   }
 
   async json(messages, options = {}) {
-    const result = await this.chat(messages, { ...options, json: true });
+    const result = await this.chat(messages, {
+      ...options,
+      // Groq rejects response_format when built-in browser search is enabled.
+      // The prompt still requires JSON and parseJsonResponse validates the result.
+      json: !options.webSearch,
+    });
     return { ...result, data: parseJsonResponse(result.content) };
   }
 
