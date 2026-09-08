@@ -28,6 +28,25 @@ function parseJsonResponse(value) {
   }
 }
 
+function compactMessages(messages, maxTotalChars = 24000) {
+  const safeMessages = Array.isArray(messages) ? messages : [];
+  const perMessage = Math.max(4000, Math.floor(maxTotalChars / Math.max(1, safeMessages.length)));
+  return safeMessages.map((message) => {
+    const content = String(message?.content || "");
+    if (content.length <= perMessage) return message;
+    const headLength = Math.floor(perMessage * 0.65);
+    const tailLength = perMessage - headLength;
+    return {
+      ...message,
+      content: `${content.slice(0, headLength)}
+
+[Context shortened to fit the model request limit.]
+
+${content.slice(-tailLength)}`,
+    };
+  });
+}
+
 class GroqClient {
   constructor(options = {}) {
     this.apiKey =
@@ -91,6 +110,14 @@ class GroqClient {
         };
       } catch (error) {
         lastError = error;
+        if (error.status === 413 && !options.compactAttempt) {
+          return this.chat(compactMessages(messages), {
+            ...options,
+            model,
+            maxTokens: Math.min(options.maxTokens ?? 8000, 3000),
+            compactAttempt: true,
+          });
+        }
         const retryable =
           error.name === "AbortError" ||
           error.status === 408 ||
@@ -133,7 +160,7 @@ class GroqClient {
         },
         { role: "user", content: prompt },
       ],
-      { research: true, temperature: 0.1, maxTokens: 7000 }
+      { research: true, temperature: 0.1, maxTokens: 3500 }
     );
   }
 }
@@ -141,5 +168,6 @@ class GroqClient {
 module.exports = {
   GROQ_ENDPOINT,
   GroqClient,
+  compactMessages,
   parseJsonResponse,
 };

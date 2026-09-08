@@ -131,7 +131,7 @@ Avoid duplicates of existing opportunities. Research:
 ${research.content}`,
         },
       ],
-      { temperature: 0.1, maxTokens: 7000 }
+      { temperature: 0.1, maxTokens: 3500 }
     );
     const postsBySlug = new Map(posts.map((post) => [post.slug, post]));
     const queuedKeywords = new Set(
