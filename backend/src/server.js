@@ -25,6 +25,7 @@ const documentUploadRoutes = require("./routes/document-upload");
 const explainToTeamRoutes = require("./routes/explain-to-team");
 const outcomesRoutes = require("./routes/outcomes");
 const dailyPulseRoutes = require("./routes/daily-pulse");
+const blogRoutes = require("./routes/blog");
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -52,6 +53,7 @@ app.use("/api/document-upload", documentUploadRoutes);
 app.use("/api/explain-to-team", explainToTeamRoutes);
 app.use("/api/outcomes", outcomesRoutes);
 app.use("/api/daily-pulse", dailyPulseRoutes);
+app.use("/api/blog", blogRoutes);
 
 app.use((error, _req, res, _next) => {
   const status = error.status || 500;

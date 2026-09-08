@@ -1,0 +1,13 @@
+VERTICAL 9:16, 10 seconds, photoreal cinematic product commercial. Continue from the previous clip. SAME CHARACTER: a restaurant owner, woman, early 30s, olive skin, dark hair in a low bun, small gold hoop earrings, white t-shirt, black cafe apron. SAME LOCATION: her small cafe at the counter, warm beige interior, wood, soft morning window light from camera left, shallow depth of field. SAME PROP: the same black smartphone in her hands, Steady app on screen, warm beige UI, dark ink text, rounded gold tan buttons, serif Steady logo, clean minimal UI, no clutter. CAMERA: handheld-stable, 35mm look, slow gentle push-in. LIGHTING: warm morning key from camera left. GRADE: warm beige and gold, filmic, clean. AUDIO MUST MATCH THE PREVIOUS CLIP EXACTLY: quiet cafe ambience, distant espresso machine hiss, soft cup clink, low warm acoustic percussion at 95 BPM continuing under the voice, do not restart the beat. VOICE MUST MATCH THE PREVIOUS CLIP EXACTLY: one warm female American narrator, mid 30s, close dry mic, confident, direct, slightly low. No second voice. Do not show pricing, plans, Stripe, Square, QuickBooks, notification banners, or a settings dashboard.
+
+Start from the previous last frame: the same phone still showing Next move: Reply today before the dinner rush.
+
+[00:00-00:03] Same chat. Voice mode overlay appears, a simple listening ring. Super: Talk it out.
+[00:03-00:05] A receipt photo chip attaches under the composer. Super: Drop in a receipt.
+[00:05-00:08] Button Explain to my team taps. A short staff script appears under the answer. Super: Send it to your team. The phone lowers a few inches.
+[00:08-00:10] Clean beige Steady end card in the same grade: Steady. Your business co-pilot. Ask Steady. It's free. Hold and freeze on the CTA. Tiny gold stinger only on this last second. Do not show prices.
+
+Narrator says: "Talk it out. Drop in a receipt. Send it to your team. Ask Steady. It's free."
+SFX: soft mic whoosh, paper/receipt tap, button click.
+Ambient: same quiet cafe, fading a little as the end card hits.
+Music: SAME 95 BPM bed continuing, tiny gold stinger only at the end, no new song.

@@ -197,6 +197,7 @@ export function AppChrome({ children }) {
 
   const navItems = [
     { href: "/", label: "Home" },
+    { href: "/blog", label: "Blog" },
     { href: "/pricing", label: "Pricing" },
     ...(isAuthenticated
       ? [{ href: "/tools/document-upload", label: "Upload" }, { href: "/profile", label: "Profile" }]
@@ -297,7 +298,7 @@ export function AppChrome({ children }) {
                 Direct, plain-spoken answers for the people running real businesses. Built to be useful in two minutes.
               </p>
             </div>
-            <FooterCol title="Product" links={[["/", "Home"], ["/pricing", "Pricing"], ["/chat", "Chat"], ["/tools/document-upload", "CSV, PDF & Photo Upload"]]} />
+            <FooterCol title="Product" links={[["/", "Home"], ["/blog", "Blog"], ["/pricing", "Pricing"], ["/chat", "Chat"], ["/tools/document-upload", "CSV, PDF & Photo Upload"]]} />
             <FooterCol title="Account" links={[["/login", "Sign in"], ["/register", "Register"], ["/profile", "Profile"]]} />
             <FooterCol title="Legal" links={[["/privacy", "Privacy"], ["/terms", "Terms"]]} />
           </div>

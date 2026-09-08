@@ -15,6 +15,7 @@ async function connectToDatabase() {
 
     connectionPromise = mongoose.connect(mongoUri, {
       autoIndex: true,
+      ...(process.env.MONGODB_DB ? { dbName: process.env.MONGODB_DB } : {}),
     });
   }
 

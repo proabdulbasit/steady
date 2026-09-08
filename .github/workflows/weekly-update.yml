@@ -1,0 +1,60 @@
+name: Research WorkSteady blog opportunities
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Research without saving opportunities
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worksteady-weekly-blog-research
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_ENV: production
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      MONGODB_DB: ${{ vars.MONGODB_DB }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_WEEKLY_API_KEY: ${{ secrets.GROQ_WEEKLY_API_KEY }}
+      GROQ_RESEARCH_MODEL: ${{ vars.GROQ_RESEARCH_MODEL || 'groq/compound' }}
+      GROQ_CONTENT_MODEL: ${{ vars.GROQ_CONTENT_MODEL || 'openai/gpt-oss-120b' }}
+      GROQ_FALLBACK_MODEL: ${{ vars.GROQ_FALLBACK_MODEL || 'openai/gpt-oss-20b' }}
+      SITE_BASE_URL: ${{ vars.SITE_BASE_URL || 'https://worksteady.app' }}
+      MAX_KEYWORD_OPPORTUNITIES: ${{ vars.MAX_KEYWORD_OPPORTUNITIES || '24' }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Run blog validation tests
+        run: npm run test:blog
+
+      - name: Research and store approved opportunities
+        run: npm run agent:weekly

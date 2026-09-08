@@ -1,0 +1,90 @@
+name: Publish WorkSteady blog posts
+
+on:
+  schedule:
+    # GitHub Actions schedules use UTC. Quality gates may publish fewer than three posts.
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+    inputs:
+      count:
+        description: Maximum number of posts to process
+        required: false
+        default: "3"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
+      dry_run:
+        description: Generate and validate without publishing
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worksteady-daily-blog
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_ENV: production
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      MONGODB_DB: ${{ vars.MONGODB_DB }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_CONTENT_MODEL: ${{ vars.GROQ_CONTENT_MODEL || 'openai/gpt-oss-120b' }}
+      GROQ_FALLBACK_MODEL: ${{ vars.GROQ_FALLBACK_MODEL || 'openai/gpt-oss-20b' }}
+      GROQ_RESEARCH_MODEL: ${{ vars.GROQ_RESEARCH_MODEL || 'groq/compound' }}
+      REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+      CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+      SITE_BASE_URL: ${{ vars.SITE_BASE_URL || 'https://worksteady.app' }}
+      CONTENT_COUNT: ${{ inputs.count || '3' }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Run blog validation tests
+        run: npm run test:blog
+
+      - name: Generate, validate, and publish
+        run: npm run agent:daily
+
+      - name: Revalidate public blog pages
+        if: ${{ success() }}
+        working-directory: .
+        env:
+          BLOG_REVALIDATE_URL: ${{ vars.BLOG_REVALIDATE_URL || 'https://worksteady.app/api/blog/revalidate' }}
+          BLOG_REVALIDATE_SECRET: ${{ secrets.BLOG_REVALIDATE_SECRET }}
+        run: |
+          if [ "$DRY_RUN" = "1" ]; then
+            echo "Dry run: skipping cache revalidation."
+            exit 0
+          fi
+          if [ -z "$BLOG_REVALIDATE_SECRET" ]; then
+            echo "::warning::BLOG_REVALIDATE_SECRET is not configured; cached pages will refresh on their normal interval."
+            exit 0
+          fi
+          curl --fail-with-body --retry 3 \
+            -X POST "$BLOG_REVALIDATE_URL" \
+            -H "Authorization: Bearer $BLOG_REVALIDATE_SECRET"

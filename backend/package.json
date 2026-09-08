@@ -5,7 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "agent:daily": "node scripts/blog-daily.js",
+    "agent:weekly": "node scripts/blog-weekly.js",
+    "test:blog": "node --test test/blog"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

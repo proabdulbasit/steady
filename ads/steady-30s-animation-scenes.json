@@ -1,0 +1,27 @@
+{
+  "title": "Steady 30-second social ad",
+  "durationSeconds": 30,
+  "sceneCount": 3,
+  "secondsPerScene": 10,
+  "note": "Superseded for Google Flow. Use ads/steady-30s-google-flow-script.json for copy-paste prompts. This file keeps the 3x10 scene map only.",
+  "scenes": [
+    {
+      "id": "scene-01",
+      "name": "Hook, account, industry",
+      "start": "0:00",
+      "end": "0:10"
+    },
+    {
+      "id": "scene-02",
+      "name": "Chat, the next move",
+      "start": "0:10",
+      "end": "0:20"
+    },
+    {
+      "id": "scene-03",
+      "name": "Voice, receipt, team, CTA",
+      "start": "0:20",
+      "end": "0:30"
+    }
+  ]
+}

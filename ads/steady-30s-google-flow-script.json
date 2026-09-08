@@ -1,0 +1,108 @@
+{
+  "title": "Steady 30s Google Flow script",
+  "tool": "Google Flow + Veo 3.1",
+  "durationSeconds": 30,
+  "sceneCount": 3,
+  "secondsPerScene": 10,
+  "howToShoot": "Generate three clips in order. Paste the identical sharedSettings.promptBlock at the top of every prompt. Use Ingredients on every clip. Scene 2 must start from Scene 1 last frame. Scene 3 must start from Scene 2 last frame. Same voice, same music, same cafe, same phone, same owner in every clip so it plays as one continuous video.",
+  "flowProject": {
+    "model": "Veo 3.1 Quality",
+    "mode": "Ingredients to Video, then Frames to Video / Scene Builder",
+    "aspectRatio": "9:16",
+    "resolution": "1080p",
+    "outputLengthNote": "Flow generates about 8 seconds per clip. Generate the 8-second prompt, then Extend 2 seconds with the matching extendPrompt so each scene is 10 seconds. Do not change settings, voice, or music on the extend.",
+    "ingredients": [
+      "Owner: woman, early 30s, olive skin, dark hair in a low bun, small gold hoops, white tee, black cafe apron, calm focused face",
+      "Phone: modern black smartphone showing Steady, warm beige UI, dark text, rounded gold buttons, serif Steady wordmark",
+      "Cafe: small daylight cafe, beige walls, wood counter, pastry case soft in background, warm morning light"
+    ]
+  },
+  "sharedSettings": {
+    "useInEveryPrompt": true,
+    "promptBlock": "VERTICAL 9:16, photoreal cinematic product commercial, one continuous shot language. SAME CHARACTER every frame: a restaurant owner, woman, early 30s, olive skin, dark hair in a low bun, small gold hoop earrings, white t-shirt, black cafe apron. SAME LOCATION every frame: her small cafe at the counter, warm beige interior, wood, soft morning window light from camera left, shallow depth of field, background slightly creamy. SAME PROP every frame: the same black smartphone in her hands, screen showing the Steady app, warm beige background, dark ink text, rounded gold tan buttons, serif Steady logo, clean minimal UI, no clutter. CAMERA: handheld-stable, 35mm look, slow gentle push-in, never whip pan, never crash zoom. LIGHTING: warm morning key from camera left, soft fill, no neon, no blue tech glow. GRADE: warm beige and gold, like the Steady brand, filmic, clean, not HDR, not cyberpunk. AUDIO BED MUST MATCH THE PREVIOUS CLIP EXACTLY: quiet cafe ambience, distant espresso machine hiss, soft cup clink, low warm acoustic percussion at 95 BPM under the voice, no new melody, no bass drop. VOICE MUST MATCH THE PREVIOUS CLIP EXACTLY: one warm female American narrator, mid 30s, close dry mic, confident, direct, slightly low, speaking to a business owner, no second voice, no robot voice, no reverb change. Do not show pricing, plans, Stripe, Square, QuickBooks, notification banners, remaining-question counters, or a settings dashboard.",
+    "negativePrompt": "pricing page, dollar amounts for plans, Square logo, QuickBooks logo, notification bell, daily briefing dashboard, JSON code, admin panel, stock smiling influencer, neon UI, dark mode, ChatGPT purple, messy notifications, extra fingers, warped phone screen text, different woman, different cafe, different phone, new music, new narrator",
+    "voice": {
+      "cast": "one female narrator only",
+      "age": "mid 30s",
+      "accent": "American",
+      "tone": "warm, direct, calm, no hype",
+      "mic": "close, dry, no booth echo",
+      "rule": "Do not change this voice between scenes. Do not add a second speaker."
+    },
+    "sound": {
+      "ambience": "quiet cafe, distant espresso, soft cup clink",
+      "music": "low warm acoustic percussion, 95 BPM, continuous bed, no reset",
+      "sfx": "soft keyboard taps, one gold-button click, one send whoosh",
+      "rule": "Same bed in all 3 clips. Music does not restart at each cut. Only a tiny gold stinger in the last 1 second of scene 3."
+    }
+  },
+  "continuousVoiceover": {
+    "note": "This is one 30-second narration. Do not restart the energy at each scene. Leave space. Do not fill every second with words.",
+    "full": "A bad review just hit your restaurant. Open Steady. Pick Restaurant. Type it like you'd say it. Get the script. One clear next move. Talk it out. Drop in a receipt. Send it to your team. Ask Steady. It's free.",
+    "byScene": {
+      "scene1": "A bad review just hit your restaurant. Open Steady. Pick Restaurant.",
+      "scene2": "Type it like you'd say it. Get the script. One clear next move.",
+      "scene3": "Talk it out. Drop in a receipt. Send it to your team. Ask Steady. It's free."
+    }
+  },
+  "continuity": {
+    "scene1LastFrame": "Extreme close-up of the same phone. Restaurant / Food and Beverage is selected. Her thumb has just tapped the gold Create account button. Cafe bokeh behind the phone.",
+    "scene2FirstFrame": "Continue from that exact phone and hands. The chat screen is now open on the same phone, same cafe, same lighting. No jump in wardrobe or location.",
+    "scene2LastFrame": "Phone screen held steady, Steady chat answer visible, gold line reading Next move: Reply today before the dinner rush.",
+    "scene3FirstFrame": "Same phone, same hands, same cafe. Start on that Next move line, then the composer tools become visible below it.",
+    "scene3LastFrame": "Phone lowers slightly. Clean beige end card: Steady wordmark, Your business co-pilot, Ask Steady. It's free."
+  },
+  "scenes": [
+    {
+      "id": "scene-01",
+      "sceneNumber": 1,
+      "name": "Hook, account, industry",
+      "start": "0:00",
+      "end": "0:10",
+      "durationSeconds": 10,
+      "generateSeconds": 8,
+      "extendSeconds": 2,
+      "flowMode": "Ingredients to Video",
+      "firstFrame": "Owner at cafe counter, phone in both hands, screen off then waking to Steady register.",
+      "lastFrame": "Phone close-up, Restaurant selected, gold Create account just tapped.",
+      "voiceover": "A bad review just hit your restaurant. Open Steady. Pick Restaurant.",
+      "onScreenText": "Tell me your problem. I'll tell you what to do.",
+      "flowPrompt": "VERTICAL 9:16, photoreal cinematic product commercial, one continuous shot language. SAME CHARACTER every frame: a restaurant owner, woman, early 30s, olive skin, dark hair in a low bun, small gold hoop earrings, white t-shirt, black cafe apron. SAME LOCATION every frame: her small cafe at the counter, warm beige interior, wood, soft morning window light from camera left, shallow depth of field, background slightly creamy. SAME PROP every frame: the same black smartphone in her hands, screen showing the Steady app, warm beige background, dark ink text, rounded gold tan buttons, serif Steady logo, clean minimal UI, no clutter. CAMERA: handheld-stable, 35mm look, slow gentle push-in, never whip pan, never crash zoom. LIGHTING: warm morning key from camera left, soft fill, no neon, no blue tech glow. GRADE: warm beige and gold, like the Steady brand, filmic, clean, not HDR, not cyberpunk. AUDIO BED MUST MATCH THE PREVIOUS CLIP EXACTLY: quiet cafe ambience, distant espresso machine hiss, soft cup clink, low warm acoustic percussion at 95 BPM under the voice, no new melody, no bass drop. VOICE MUST MATCH THE PREVIOUS CLIP EXACTLY: one warm female American narrator, mid 30s, close dry mic, confident, direct, slightly low, speaking to a business owner, no second voice, no robot voice, no reverb change. Do not show pricing, plans, Stripe, Square, QuickBooks, notification banners, remaining-question counters, or a settings dashboard.\n\n[00:00-00:02] Medium close-up of the owner at her cafe counter, worried eyes on her phone. Super text in a clean serif: Tell me your problem. I'll tell you what to do.\n[00:02-00:07] Slow push into the phone. Steady register screen. Name field fills Jane Owner. Email fills. Industry dropdown opens. She taps Restaurant / Food and Beverage. Gold Create account button presses with a soft click.\n[00:07-00:08] Tighter on the phone. Restaurant chip locks gold. Her thumb rests on the screen. Hold.\n\nNarrator says: \"A bad review just hit your restaurant. Open Steady. Pick Restaurant.\"\nSFX: soft keyboard taps, one gold button click.\nAmbient: quiet cafe, espresso hiss, cup clink.\nMusic: same low warm 95 BPM percussion under the voice.",
+      "extendPrompt": "VERTICAL 9:16. Continue the EXACT same woman, same black apron, same cafe, same morning light, same black phone, same Steady beige UI, same narrator, same quiet cafe ambience, same 95 BPM warm percussion. Do not cut. Do not change angle violently. [00:08-00:10] Hold the phone close-up. Restaurant / Food and Beverage stays selected. Gold Create account is pressed. Tiny super: Built around your business. End frozen on the phone screen so the next clip can continue from this frame."
+    },
+    {
+      "id": "scene-02",
+      "sceneNumber": 2,
+      "name": "Chat, the next move",
+      "start": "0:10",
+      "end": "0:20",
+      "durationSeconds": 10,
+      "generateSeconds": 8,
+      "extendSeconds": 2,
+      "flowMode": "Frames to Video. First frame = Scene 1 last frame.",
+      "firstFrame": "Same phone and hands from Scene 1 last frame. Chat has just opened.",
+      "lastFrame": "Steady answer on screen. Gold Next move line is readable and held.",
+      "voiceover": "Type it like you'd say it. Get the script. One clear next move.",
+      "onScreenText": "One clear next move. Every time.",
+      "flowPrompt": "VERTICAL 9:16, photoreal cinematic product commercial, one continuous shot language. SAME CHARACTER every frame: a restaurant owner, woman, early 30s, olive skin, dark hair in a low bun, small gold hoop earrings, white t-shirt, black cafe apron. SAME LOCATION every frame: her small cafe at the counter, warm beige interior, wood, soft morning window light from camera left, shallow depth of field, background slightly creamy. SAME PROP every frame: the same black smartphone in her hands, screen showing the Steady app, warm beige background, dark ink text, rounded gold tan buttons, serif Steady logo, clean minimal UI, no clutter. CAMERA: handheld-stable, 35mm look, slow gentle push-in, never whip pan, never crash zoom. LIGHTING: warm morning key from camera left, soft fill, no neon, no blue tech glow. GRADE: warm beige and gold, like the Steady brand, filmic, clean, not HDR, not cyberpunk. AUDIO BED MUST MATCH THE PREVIOUS CLIP EXACTLY: quiet cafe ambience, distant espresso machine hiss, soft cup clink, low warm acoustic percussion at 95 BPM under the voice, no new melody, no bass drop. VOICE MUST MATCH THE PREVIOUS CLIP EXACTLY: one warm female American narrator, mid 30s, close dry mic, confident, direct, slightly low, speaking to a business owner, no second voice, no robot voice, no reverb change. Do not show pricing, plans, Stripe, Square, QuickBooks, notification banners, remaining-question counters, or a settings dashboard.\n\nStart from the previous last frame: the same phone, Restaurant already chosen, gold button just tapped. The screen now shows Steady chat. Empty state: What are you working on?\n\n[00:00-00:02] Phone fills the frame. Chat composer placeholder: What's going on with your business?\n[00:02-00:06] Text types fast: A customer slammed us for slow service. How do I reply without sounding defensive? Gold send arrow taps. Soft whoosh.\n[00:06-00:08] User bubble on the right. Line: Steady is thinking... Then a beige answer bubble streams in: Reply within 24 hours. Acknowledge the wait. Offer a private follow-up.\n\nNarrator says: \"Type it like you'd say it. Get the script. One clear next move.\"\nSFX: keyboard taps, send whoosh, soft message pop.\nAmbient: same quiet cafe, espresso hiss, cup clink.\nMusic: the SAME 95 BPM warm percussion continuing, do not restart the beat.",
+      "extendPrompt": "VERTICAL 9:16. Continue the EXACT same woman, same cafe, same phone, same lighting, same narrator, same music bed. Do not cut away from the phone. [00:08-00:10] The answer finishes. A gold line appears and holds: Next move: Reply today before the dinner rush. Super: One clear next move. Every time. Freeze on that Next move line for the last 0.6 seconds so the next clip can continue from this frame."
+    },
+    {
+      "id": "scene-03",
+      "sceneNumber": 3,
+      "name": "Voice, receipt, team, CTA",
+      "start": "0:20",
+      "end": "0:30",
+      "durationSeconds": 10,
+      "generateSeconds": 8,
+      "extendSeconds": 2,
+      "flowMode": "Frames to Video. First frame = Scene 2 last frame.",
+      "firstFrame": "Same phone showing the Next move line from Scene 2.",
+      "lastFrame": "Beige end card with Steady wordmark and Ask Steady. It's free.",
+      "voiceover": "Talk it out. Drop in a receipt. Send it to your team. Ask Steady. It's free.",
+      "onScreenText": "Ask Steady. It's free.",
+      "flowPrompt": "VERTICAL 9:16, photoreal cinematic product commercial, one continuous shot language. SAME CHARACTER every frame: a restaurant owner, woman, early 30s, olive skin, dark hair in a low bun, small gold hoop earrings, white t-shirt, black cafe apron. SAME LOCATION every frame: her small cafe at the counter, warm beige interior, wood, soft morning window light from camera left, shallow depth of field, background slightly creamy. SAME PROP every frame: the same black smartphone in her hands, screen showing the Steady app, warm beige background, dark ink text, rounded gold tan buttons, serif Steady logo, clean minimal UI, no clutter. CAMERA: handheld-stable, 35mm look, slow gentle push-in, never whip pan, never crash zoom. LIGHTING: warm morning key from camera left, soft fill, no neon, no blue tech glow. GRADE: warm beige and gold, like the Steady brand, filmic, clean, not HDR, not cyberpunk. AUDIO BED MUST MATCH THE PREVIOUS CLIP EXACTLY: quiet cafe ambience, distant espresso machine hiss, soft cup clink, low warm acoustic percussion at 95 BPM under the voice, no new melody, no bass drop. VOICE MUST MATCH THE PREVIOUS CLIP EXACTLY: one warm female American narrator, mid 30s, close dry mic, confident, direct, slightly low, speaking to a business owner, no second voice, no robot voice, no reverb change. Do not show pricing, plans, Stripe, Square, QuickBooks, notification banners, remaining-question counters, or a settings dashboard.\n\nStart from the previous last frame: the same phone still showing Next move: Reply today before the dinner rush.\n\n[00:00-00:03] Same chat. Voice mode overlay appears, a simple listening ring. She is not shouting. Super: Talk it out.\n[00:03-00:05] A receipt photo chip attaches under the composer. Super: Drop in a receipt.\n[00:05-00:08] Button Explain to my team taps. A short staff script appears under the answer. Super: Send it to your team. Then the phone lowers a few inches. Cut to a clean beige Steady end card in the same grade: Steady. Your business co-pilot. Ask Steady. It's free.\n\nNarrator says: \"Talk it out. Drop in a receipt. Send it to your team. Ask Steady. It's free.\"\nSFX: soft mic whoosh, paper/receipt tap, button click.\nAmbient: same quiet cafe, fading a little as the end card hits.\nMusic: SAME 95 BPM bed continuing, tiny gold stinger only on the last second, no new song.",
+      "extendPrompt": "VERTICAL 9:16. Continue the EXACT same grade, same narrator, same music. No new character. [00:08-00:10] Hold the beige end card. Steady wordmark. Your business co-pilot. Ask Steady. It's free. Tiny gold stinger. Cafe ambience almost gone. Do not show prices or plans. Freeze on the CTA."
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+VERTICAL 9:16, 10 seconds, photoreal cinematic product commercial. Continue from the previous clip. SAME CHARACTER: a restaurant owner, woman, early 30s, olive skin, dark hair in a low bun, small gold hoop earrings, white t-shirt, black cafe apron. SAME LOCATION: her small cafe at the counter, warm beige interior, wood, soft morning window light from camera left, shallow depth of field. SAME PROP: the same black smartphone in her hands, Steady app on screen, warm beige UI, dark ink text, rounded gold tan buttons, serif Steady logo, clean minimal UI, no clutter. CAMERA: handheld-stable, 35mm look, slow gentle push-in. LIGHTING: warm morning key from camera left. GRADE: warm beige and gold, filmic, clean. AUDIO MUST MATCH THE PREVIOUS CLIP EXACTLY: quiet cafe ambience, distant espresso machine hiss, soft cup clink, low warm acoustic percussion at 95 BPM continuing under the voice, do not restart the beat. VOICE MUST MATCH THE PREVIOUS CLIP EXACTLY: one warm female American narrator, mid 30s, close dry mic, confident, direct, slightly low. No second voice. Do not show pricing, plans, Stripe, Square, QuickBooks, notification banners, or a settings dashboard.
+
+Start from the previous last frame: the same phone and hands, Restaurant already chosen, gold Create account just tapped. The screen now shows Steady chat. Empty state: What are you working on?
+
+[00:00-00:02] Phone fills the frame. Chat composer placeholder: What's going on with your business?
+[00:02-00:06] Text types fast: A customer slammed us for slow service. How do I reply without sounding defensive? Gold send arrow taps. Soft whoosh.
+[00:06-00:08] User bubble on the right. Line: Steady is thinking... Then a beige answer bubble streams in: Reply within 24 hours. Acknowledge the wait. Offer a private follow-up.
+[00:08-00:10] Gold line appears and holds: Next move: Reply today before the dinner rush. Super: One clear next move. Every time. Freeze the last frame on that Next move line.
+
+Narrator says: "Type it like you'd say it. Get the script. One clear next move."
+SFX: keyboard taps, send whoosh, soft message pop.
+Ambient: same quiet cafe, espresso hiss, cup clink.
+Music: the SAME 95 BPM warm percussion continuing, do not restart.

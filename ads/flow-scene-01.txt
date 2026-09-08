@@ -1,0 +1,10 @@
+VERTICAL 9:16, 10 seconds, photoreal cinematic product commercial. SAME CHARACTER: a restaurant owner, woman, early 30s, olive skin, dark hair in a low bun, small gold hoop earrings, white t-shirt, black cafe apron. SAME LOCATION: her small cafe at the counter, warm beige interior, wood, soft morning window light from camera left, shallow depth of field. SAME PROP: the same black smartphone in her hands, Steady app on screen, warm beige UI, dark ink text, rounded gold tan buttons, serif Steady logo, clean minimal UI, no clutter. CAMERA: handheld-stable, 35mm look, slow gentle push-in. LIGHTING: warm morning key from camera left. GRADE: warm beige and gold, filmic, clean. AUDIO: quiet cafe ambience, distant espresso machine hiss, soft cup clink, low warm acoustic percussion at 95 BPM under the voice. VOICE: one warm female American narrator, mid 30s, close dry mic, confident, direct, slightly low. Do not show pricing, plans, Stripe, Square, QuickBooks, notification banners, or a settings dashboard.
+
+[00:00-00:02] Medium close-up of the owner at her cafe counter, worried eyes on her phone. Super text in a clean serif: Tell me your problem. I'll tell you what to do.
+[00:02-00:07] Slow push into the phone. Steady register screen. Name field fills Jane Owner. Email fills. Industry dropdown opens. She taps Restaurant / Food and Beverage. Gold Create account button presses with a soft click.
+[00:07-00:10] Tighter on the phone. Restaurant chip locks gold. Tiny super: Built around your business. Hold on the phone screen, thumb resting after the tap. Freeze the last frame on this close-up.
+
+Narrator says: "A bad review just hit your restaurant. Open Steady. Pick Restaurant."
+SFX: soft keyboard taps, one gold button click.
+Ambient: quiet cafe, espresso hiss, cup clink.
+Music: low warm 95 BPM percussion under the voice, do not restart, no bass drop.
