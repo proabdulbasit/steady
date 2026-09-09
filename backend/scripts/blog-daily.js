@@ -319,7 +319,7 @@ Return short notes plus the exact URLs.`
     featuredImage,
     publishedAt: existingPost?.publishedAt,
   });
-  if (markdownWordCount(postData.content) < 1200) {
+  if (markdownWordCount(postData.content) < 900) {
     const expansion = await groq.json(
       [
         {
@@ -353,11 +353,16 @@ Return short notes plus the exact URLs.`
   }
   const closest = findClosestDuplicate(
     postData,
-    allPosts.filter((post) => String(post._id) !== String(existingPost?._id))
+    allPosts.filter(
+      (post) =>
+        String(post._id) !== String(existingPost?._id) &&
+        String(post.opportunityId || "") !== String(opportunity._id) &&
+        post.slug !== slug
+    )
   );
   const report = validateQuality(postData, {
     qualityThreshold: qualityThreshold(),
-    minWords: 1200,
+    minWords: 900,
   });
   const sourceCheck = await validateReachableSources(postData);
   report.checks.reachableSources = sourceCheck.checked;
