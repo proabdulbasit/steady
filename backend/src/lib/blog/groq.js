@@ -121,6 +121,12 @@ class GroqClient {
             messages,
             temperature: options.temperature ?? 0.2,
             max_completion_tokens: options.maxTokens ?? 8000,
+            ...(options.webSearch
+              ? {
+                  reasoning_effort: options.reasoningEffort || "low",
+                  tool_choice: "required",
+                }
+              : {}),
             ...(options.json ? { response_format: { type: "json_object" } } : {}),
             ...(options.webSearch
               ? { tools: [{ type: "browser_search" }] }
@@ -139,7 +145,22 @@ class GroqClient {
           throw error;
         }
         const content = body.choices?.[0]?.message?.content;
-        if (!content) throw new Error("Groq returned an empty completion.");
+        if (!content) {
+          if (options.webSearch && !options.emptyCompletionRetry) {
+            return this.chat(messages, {
+              ...options,
+              model,
+              reasoningEffort: "low",
+              maxTokens: Math.max(options.maxTokens ?? 0, 4096),
+              emptyCompletionRetry: true,
+            });
+          }
+          const finishReason = body.choices?.[0]?.finish_reason || "unknown";
+          const completionTokens = body.usage?.completion_tokens ?? "unknown";
+          throw new Error(
+            `Groq returned an empty completion (finish_reason=${finishReason}, completion_tokens=${completionTokens}).`
+          );
+        }
         return {
           content,
           model: body.model || model,

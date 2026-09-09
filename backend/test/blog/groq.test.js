@@ -50,6 +50,8 @@ test("research uses GPT-OSS browser search instead of Compound", async () => {
 
   assert.equal(requestBody.model, "openai/gpt-oss-20b");
   assert.deepEqual(requestBody.tools, [{ type: "browser_search" }]);
+  assert.equal(requestBody.tool_choice, "required");
+  assert.equal(requestBody.reasoning_effort, "low");
 });
 
 test("browser-search JSON requests omit Groq's incompatible response format", async () => {
@@ -77,5 +79,37 @@ test("browser-search JSON requests omit Groq's incompatible response format", as
 
   assert.deepEqual(requestBody.tools, [{ type: "browser_search" }]);
   assert.equal(requestBody.response_format, undefined);
+  assert.deepEqual(result.data, { opportunities: [] });
+});
+
+test("empty browser-search completions retry with a larger output budget", async () => {
+  const requestBodies = [];
+  const client = new GroqClient({
+    apiKey: "test-key",
+    researchModel: "openai/gpt-oss-20b",
+    maxRetries: 0,
+    fetch: async (_url, options) => {
+      requestBodies.push(JSON.parse(options.body));
+      const content =
+        requestBodies.length === 1 ? "" : '{"opportunities":[]}';
+      return new Response(
+        JSON.stringify({
+          model: "openai/gpt-oss-20b",
+          choices: [{ finish_reason: "length", message: { content } }],
+          usage: { completion_tokens: 2500 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    },
+  });
+
+  const result = await client.json(
+    [{ role: "user", content: "Research and return JSON." }],
+    { research: true, webSearch: true, maxTokens: 2500 }
+  );
+
+  assert.equal(requestBodies.length, 2);
+  assert.equal(requestBodies[0].max_completion_tokens, 2500);
+  assert.equal(requestBodies[1].max_completion_tokens, 4096);
   assert.deepEqual(result.data, { opportunities: [] });
 });
