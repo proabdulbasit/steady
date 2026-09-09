@@ -65,6 +65,7 @@ function sourceFromCitation(citation) {
 async function verifiedResearchSources(opportunity, research) {
   const candidates = normalizeReferences([
     ...(opportunity.evidence || []),
+    ...(research.sources || []),
     ...(research.citations || []).map(sourceFromCitation).filter(Boolean),
   ]);
   const check = await validateReachableSources({ sourceReferences: candidates });

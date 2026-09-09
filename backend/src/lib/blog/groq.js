@@ -71,6 +71,32 @@ ${content.slice(-tailLength)}`,
   });
 }
 
+function extractSearchSources(body) {
+  const message = body?.choices?.[0]?.message || {};
+  const tools = [
+    ...(Array.isArray(message.executed_tools) ? message.executed_tools : []),
+    ...(Array.isArray(body?.executed_tools) ? body.executed_tools : []),
+  ];
+  const sources = [];
+  for (const tool of tools) {
+    const searchResults = Array.isArray(tool?.search_results)
+      ? tool.search_results
+      : tool?.search_results?.results;
+    for (const result of Array.isArray(searchResults) ? searchResults : []) {
+      if (!result?.url || !/^https:\/\//i.test(result.url)) continue;
+      sources.push({
+        title: String(result.title || new URL(result.url).hostname),
+        url: String(result.url),
+        publisher: String(result.publisher || new URL(result.url).hostname.replace(/^www\./, "")),
+      });
+    }
+  }
+  return sources.filter(
+    (source, index, all) =>
+      all.findIndex((candidate) => candidate.url === source.url) === index
+  );
+}
+
 class GroqClient {
   constructor(options = {}) {
     this.apiKey =
@@ -81,6 +107,10 @@ class GroqClient {
       options.researchModel ||
       process.env.GROQ_RESEARCH_MODEL ||
       "openai/gpt-oss-20b";
+    this.searchModel =
+      options.searchModel ||
+      process.env.GROQ_SEARCH_MODEL ||
+      "groq/compound-mini";
     this.contentModel =
       options.contentModel || process.env.GROQ_CONTENT_MODEL || "openai/gpt-oss-120b";
     this.fallbackModel =
@@ -144,7 +174,8 @@ class GroqClient {
           error.retryAfterMs = retryAfterMs(response, message);
           throw error;
         }
-        const content = body.choices?.[0]?.message?.content;
+        const message = body.choices?.[0]?.message || {};
+        const content = message.content;
         if (!content) {
           if (options.webSearch && !options.emptyCompletionRetry) {
             return this.chat(messages, {
@@ -165,7 +196,8 @@ class GroqClient {
           content,
           model: body.model || model,
           usage: body.usage || {},
-          citations: body.citations || body.choices?.[0]?.message?.citations || [],
+          citations: body.citations || message.citations || [],
+          sources: extractSearchSources(body),
         };
       } catch (error) {
         lastError = error;
@@ -232,8 +264,8 @@ class GroqClient {
         { role: "user", content: prompt },
       ],
       {
+        model: this.searchModel,
         research: true,
-        webSearch: true,
         temperature: 0.1,
         maxTokens: 2500,
       }
@@ -246,6 +278,7 @@ module.exports = {
   GroqClient,
   compactMessages,
   durationToMs,
+  extractSearchSources,
   parseJsonResponse,
   retryAfterMs,
 };

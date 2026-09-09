@@ -4,6 +4,7 @@ const {
   GroqClient,
   compactMessages,
   durationToMs,
+  extractSearchSources,
   retryAfterMs,
 } = require("../../src/lib/blog/groq");
 
@@ -28,30 +29,67 @@ test("Groq retry timing understands rate-limit headers and messages", () => {
   assert.equal(retryAfterMs(response, "Please try again in 376ms"), 1500);
 });
 
-test("research uses GPT-OSS browser search instead of Compound", async () => {
+test("research uses Compound Mini and exposes raw search-result URLs", async () => {
   let requestBody;
   const client = new GroqClient({
     apiKey: "test-key",
-    researchModel: "openai/gpt-oss-20b",
+    searchModel: "groq/compound-mini",
     maxRetries: 0,
     fetch: async (_url, options) => {
       requestBody = JSON.parse(options.body);
       return new Response(
         JSON.stringify({
-          model: "openai/gpt-oss-20b",
-          choices: [{ message: { content: "Grounded research" } }],
+          model: "groq/compound-mini",
+          choices: [{
+            message: {
+              content: "Grounded research",
+              executed_tools: [{
+                search_results: {
+                  results: [{
+                    title: "Scheduling guidance",
+                    url: "https://example.com/scheduling",
+                  }],
+                },
+              }],
+            },
+          }],
         }),
         { status: 200, headers: { "content-type": "application/json" } }
       );
     },
   });
 
-  await client.research("Find a current small-business operations topic.");
+  const result = await client.research("Find a current small-business operations topic.");
 
-  assert.equal(requestBody.model, "openai/gpt-oss-20b");
-  assert.deepEqual(requestBody.tools, [{ type: "browser_search" }]);
-  assert.equal(requestBody.tool_choice, "required");
-  assert.equal(requestBody.reasoning_effort, "low");
+  assert.equal(requestBody.model, "groq/compound-mini");
+  assert.equal(requestBody.tools, undefined);
+  assert.deepEqual(result.sources, [{
+    title: "Scheduling guidance",
+    url: "https://example.com/scheduling",
+    publisher: "example.com",
+  }]);
+});
+
+test("search-source extraction ignores duplicate and non-HTTPS results", () => {
+  const body = {
+    choices: [{
+      message: {
+        executed_tools: [{
+          search_results: [
+            { title: "Primary", url: "https://example.com/source" },
+            { title: "Duplicate", url: "https://example.com/source" },
+            { title: "Unsafe", url: "http://example.com/source" },
+          ],
+        }],
+      },
+    }],
+  };
+
+  assert.deepEqual(extractSearchSources(body), [{
+    title: "Primary",
+    url: "https://example.com/source",
+    publisher: "example.com",
+  }]);
 });
 
 test("browser-search JSON requests omit Groq's incompatible response format", async () => {
