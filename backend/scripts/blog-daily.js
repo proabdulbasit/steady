@@ -173,8 +173,8 @@ async function persistCandidate({
 
   if (existingPost) {
     // A failed refresh must never take an already-published URL offline.
-    // The opportunity carries the needs_review state and error details.
-    if (!publish) return existingPost;
+    // Unpublished drafts can be replaced so the next retry is not a duplicate of itself.
+    if (!publish && existingPost.status === "published") return existingPost;
     if (publish) {
       for (const revisionPost of [existingPost, ...(mergePosts || [])]) {
         await BlogPostRevision.findOneAndUpdate(
@@ -230,12 +230,15 @@ async function processOpportunity({
   usedSourceIds,
   dryRun,
 }) {
+  const existingDraft = allPosts.find(
+    (post) => String(post.opportunityId) === String(opportunity._id)
+  );
   const existingPost =
     opportunity.type === "new"
-      ? null
+      ? existingDraft || null
       : allPosts.find(
           (post) => String(post._id) === String(opportunity.existingPostId)
-        );
+        ) || existingDraft;
   if (opportunity.type !== "new" && !existingPost) {
     throw new Error("Update/consolidation opportunity has no existing post.");
   }
@@ -319,7 +322,7 @@ Return short notes plus the exact URLs.`
     featuredImage,
     publishedAt: existingPost?.publishedAt,
   });
-  if (markdownWordCount(postData.content) < 900) {
+  if (markdownWordCount(postData.content) < 800) {
     const expansion = await groq.json(
       [
         {
@@ -362,7 +365,7 @@ Return short notes plus the exact URLs.`
   );
   const report = validateQuality(postData, {
     qualityThreshold: qualityThreshold(),
-    minWords: 900,
+    minWords: 800,
   });
   const sourceCheck = await validateReachableSources(postData);
   report.checks.reachableSources = sourceCheck.checked;
@@ -460,7 +463,7 @@ async function runDaily(options = {}) {
     const allPosts = await BlogPost.find({
       status: { $in: ["published", "needs_review", "draft"] },
     })
-      .select("+featuredImage.prompt +sourceReferences +normalizedKeyword +contentHash +previousSlugs")
+      .select("+featuredImage.prompt +sourceReferences +normalizedKeyword +contentHash +previousSlugs +opportunityId")
       .lean();
     const usedFingerprints = new Set(
       allPosts

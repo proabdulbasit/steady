@@ -61,7 +61,10 @@ function duplicateScore(candidate, existing) {
     keyword: Number(keyword.toFixed(4)),
     title: Number(title.toFixed(4)),
     content: Number(content.toFixed(4)),
-    duplicate: keyword === 1 || score >= 0.72 || (title >= 0.85 && content >= 0.5),
+    duplicate:
+      score >= 0.72 ||
+      (title >= 0.85 && content >= 0.5) ||
+      (keyword === 1 && title >= 0.8 && content >= 0.45),
   };
 }
 

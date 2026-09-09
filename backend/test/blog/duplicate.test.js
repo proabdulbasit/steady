@@ -10,7 +10,24 @@ test("normalization removes punctuation and casing differences", () => {
   assert.equal(normalizeText("Cash-Flow: A Guide!"), "cash flow a guide");
 });
 
-test("exact normalized keywords are duplicates", () => {
+test("near-identical titles with the same keyword are duplicates", () => {
+  const result = duplicateScore(
+    {
+      title: "Small Business Cash Flow Planning",
+      primaryKeyword: "small business cash flow",
+      content: "Use a weekly forecast to review cash flow, upcoming bills, and owner decisions for the next month of operations.",
+    },
+    {
+      title: "Small Business Cash Flow Planning",
+      normalizedKeyword: "small business cash flow",
+      content: "Use a weekly forecast to review cash flow, upcoming bills, and owner decisions for the next month of operations.",
+    }
+  );
+  assert.equal(result.keyword, 1);
+  assert.equal(result.duplicate, true);
+});
+
+test("the same keyword with a rewritten article is not automatically a duplicate", () => {
   const result = duplicateScore(
     {
       title: "A Practical Cash Flow Guide",
@@ -18,13 +35,13 @@ test("exact normalized keywords are duplicates", () => {
       content: "Plan cash flow with a rolling weekly forecast and review.",
     },
     {
-      title: "Small Business Cash Flow Planning",
+      title: "How Owners Should Sequence Supplier Payments",
       normalizedKeyword: "small business cash flow",
-      content: "Use a weekly forecast to review cash flow and upcoming bills.",
+      content: "Group supplier invoices by due date and keep a cash buffer for payroll.",
     }
   );
   assert.equal(result.keyword, 1);
-  assert.equal(result.duplicate, true);
+  assert.equal(result.duplicate, false);
 });
 
 test("unrelated topics receive a low score", () => {
