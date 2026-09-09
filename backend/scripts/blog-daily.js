@@ -151,7 +151,7 @@ async function persistCandidate({
   publish,
 }) {
   const now = new Date();
-  const qualityScore = Math.min(report.score, editorial.score);
+  const qualityScore = report.score;
   const status = publish ? "published" : "needs_review";
   const finalData = {
     ...postData,
@@ -387,10 +387,7 @@ Return short notes plus the exact URLs.`
     report.hardPass = false;
   }
   const editorial = await runEditorialCritic(groq, postData);
-  const publish =
-    report.hardPass &&
-    report.score >= qualityThreshold() &&
-    editorial.score >= 60;
+  const publish = report.hardPass && report.score >= qualityThreshold();
 
   let savedPost = null;
   if (!dryRun) {
