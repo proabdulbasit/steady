@@ -2,8 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   isAllowedInternalUrl,
+  validateReachableSources,
   validateQuality,
 } = require("../../src/lib/blog/quality");
+const { buildGenerationPrompt } = require("../../src/lib/blog/pipeline");
 const { buildBlogSchema } = require("../../src/lib/blog/schema");
 
 function validPost(overrides = {}) {
@@ -87,4 +89,43 @@ test("schema builder is deterministic and emits article and breadcrumbs", () => 
 test("root-level article links are allowed while reserved routes stay protected", () => {
   assert.equal(isAllowedInternalUrl("/weekly-cash-flow-review"), true);
   assert.equal(isAllowedInternalUrl("/dashboard"), false);
+});
+
+test("source validation identifies the exact reachable URLs", async () => {
+  const post = {
+    sourceReferences: [
+      { url: "https://example.com/reachable" },
+      { url: "https://example.com/missing" },
+    ],
+  };
+  const result = await validateReachableSources(post, {
+    fetch: async (url) =>
+      new Response(null, {
+        status: String(url).endsWith("/missing") ? 404 : 200,
+      }),
+  });
+
+  assert.deepEqual(result.reachable, ["https://example.com/reachable"]);
+  assert.deepEqual(result.broken, [
+    "https://example.com/missing returned HTTP 404",
+  ]);
+});
+
+test("generation prompt requires verified URLs and a safe word-count margin", () => {
+  const prompt = buildGenerationPrompt(
+    { keyword: "cash flow" },
+    "Research summary",
+    [],
+    [
+      {
+        title: "Cash flow guidance",
+        url: "https://www.sba.gov/cash-flow",
+        publisher: "SBA",
+      },
+    ]
+  );
+
+  assert.match(prompt, /1,400-1,800 useful words/);
+  assert.match(prompt, /https:\/\/www\.sba\.gov\/cash-flow/);
+  assert.match(prompt, /Use only URLs listed under/);
 });

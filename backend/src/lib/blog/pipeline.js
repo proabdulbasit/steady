@@ -141,7 +141,7 @@ async function claimOpportunities(KeywordOpportunity, count, lockId, options = {
   return claimed;
 }
 
-function buildGenerationPrompt(opportunity, research, existingPosts) {
+function buildGenerationPrompt(opportunity, research, existingPosts, verifiedSources = []) {
   const internalTargets = [
     {
       title: "WorkSteady small-business AI guidance",
@@ -172,6 +172,9 @@ ${JSON.stringify(opportunity)}
 Current cited research:
 ${research}
 
+Verified external sources:
+${JSON.stringify(verifiedSources)}
+
 Allowed internal pages and relevant posts:
 ${JSON.stringify(internalTargets)}
 
@@ -180,10 +183,15 @@ secondaryKeywords, searchIntent, category, tags, metaTitle, metaDescription,
 openGraph, internalLinks [{href,anchor}], sourceReferences
 [{title,url,publisher}], imagePrompt, imageAlt, and featured.
 
-Requirements: at least 1,200 useful words; no Markdown H1; descriptive H2/H3
-structure; factual claims linked to HTTPS source references; no fabricated
-statistics, customer stories, search volumes, or product capabilities; 2-5
-contextual internal links; concrete advice for small-business operators.
+Requirements: 1,400-1,800 useful words; no Markdown H1; descriptive H2/H3
+structure; cite at least two verified external sources inside the Markdown
+using normal [descriptive anchor](exact URL) links. Use only URLs listed under
+"Verified external sources" for external links and sourceReferences; never
+invent, alter, or guess a URL. Do not use citation-marker syntax such as
+bracketed line-number markers. Include no fabricated statistics, customer stories, search volumes,
+or product capabilities; add 2-5 contextual links selected exactly from
+"Allowed internal pages and relevant posts"; provide concrete advice for
+small-business operators.
 The image prompt must be editorial, photorealistic, brand-safe, contain no text
 or logos, and be specific to this article.`;
 }

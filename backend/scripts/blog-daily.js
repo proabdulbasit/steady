@@ -7,6 +7,7 @@ const {
   isDryRun,
   loadBackendEnv,
   normalizeGeneratedPost,
+  normalizeReferences,
   runEditorialCritic,
 } = require("../src/lib/blog/pipeline");
 
@@ -43,6 +44,32 @@ function isSystemicError(error) {
       error?.message || ""
     )
   );
+}
+
+function sourceFromCitation(citation) {
+  const value = typeof citation === "string" ? { url: citation } : citation || {};
+  try {
+    const url = new URL(value.url);
+    if (url.protocol !== "https:") return null;
+    const publisher = String(value.publisher || url.hostname.replace(/^www\./, "")).trim();
+    return {
+      title: String(value.title || publisher).trim(),
+      url: url.toString(),
+      publisher,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function verifiedResearchSources(opportunity, research) {
+  const candidates = normalizeReferences([
+    ...(opportunity.evidence || []),
+    ...(research.citations || []).map(sourceFromCitation).filter(Boolean),
+  ]);
+  const check = await validateReachableSources({ sourceReferences: candidates });
+  const reachable = new Set(check.reachable || []);
+  return candidates.filter((source) => reachable.has(source.url)).slice(0, 8);
 }
 
 async function markOpportunity(opportunityId, values) {
@@ -222,6 +249,12 @@ Competing articles to consolidate:
 ${JSON.stringify(mergePosts.map((post) => ({ title: post.title, content: post.content })))}
 Return evidence with direct HTTPS citations. Never invent search volume, product
 features, statistics, or customer results.`);
+  const verifiedSources = await verifiedResearchSources(opportunity, research);
+  if (verifiedSources.length < 2) {
+    throw new Error(
+      `Research returned ${verifiedSources.length} reachable source(s); at least 2 are required.`
+    );
+  }
   const generation = await groq.json(
     [
       {
@@ -231,12 +264,20 @@ features, statistics, or customer results.`);
       },
       {
         role: "user",
-        content: buildGenerationPrompt(opportunity, research.content, allPosts),
+        content: buildGenerationPrompt(
+          opportunity,
+          research.content,
+          allPosts,
+          verifiedSources
+        ),
       },
     ],
     { temperature: 0.25, maxTokens: 12000 }
   );
   const generated = generation.data;
+  // Never persist model-invented references. Only sources verified immediately
+  // before generation are allowed into validation and the published article.
+  generated.sourceReferences = verifiedSources;
   const slug = existingPost
     ? existingPost.slug
     : await createUniqueSlug(generated.title || opportunity.titleSuggestion, async (candidate) => {
@@ -483,4 +524,6 @@ module.exports = {
   processOpportunity,
   qualityThreshold,
   runDaily,
+  sourceFromCitation,
+  verifiedResearchSources,
 };

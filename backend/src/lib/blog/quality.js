@@ -85,6 +85,7 @@ async function validateReachableSources(post, options = {}) {
     ),
   ];
   const broken = [];
+  const reachable = [];
   for (const url of urls) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -108,6 +109,8 @@ async function validateReachableSources(post, options = {}) {
       }
       if (response.status === 404 || response.status === 410 || response.status >= 500) {
         broken.push(`${url} returned HTTP ${response.status}`);
+      } else {
+        reachable.push(url);
       }
     } catch (error) {
       broken.push(`${url} could not be reached (${error.name || "network error"})`);
@@ -115,7 +118,7 @@ async function validateReachableSources(post, options = {}) {
       clearTimeout(timer);
     }
   }
-  return { checked: urls.length, broken };
+  return { checked: urls.length, broken, reachable };
 }
 
 function validateQuality(post, options = {}) {
