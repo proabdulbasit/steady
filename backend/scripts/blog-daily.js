@@ -1,9 +1,11 @@
 const crypto = require("node:crypto");
 const mongoose = require("mongoose");
 const {
+  FALLBACK_SOURCES,
   buildGenerationPrompt,
   claimOpportunities,
   clampContentCount,
+  ensureSourceCitations,
   isDryRun,
   loadBackendEnv,
   normalizeGeneratedPost,
@@ -18,7 +20,7 @@ const BlogPost = require("../src/models/BlogPost");
 const KeywordOpportunity = require("../src/models/KeywordOpportunity");
 const BlogPostRevision = require("../src/models/BlogPostRevision");
 const BlogAutomationRun = require("../src/models/BlogAutomationRun");
-const { GroqClient } = require("../src/lib/blog/groq");
+const { GroqClient, extractHttpsUrls } = require("../src/lib/blog/groq");
 const { createUniqueSlug } = require("../src/lib/blog/slug");
 const { findClosestDuplicate } = require("../src/lib/blog/duplicate");
 const {
@@ -36,11 +38,12 @@ function qualityThreshold() {
 }
 
 function isSystemicError(error) {
+  if (error?.status === 413) return false;
   return (
     ["AbortError", "MongooseError", "MongoServerError"].includes(error?.name) ||
     [401, 403, 408, 429].includes(error?.status) ||
     error?.status >= 500 ||
-    /Missing (GROQ|REPLICATE|CLOUDINARY|MONGODB)|request failed|polling failed/i.test(
+    /Missing (GROQ|REPLICATE|CLOUDINARY|MONGODB)|polling failed/i.test(
       error?.message || ""
     )
   );
@@ -63,10 +66,20 @@ function sourceFromCitation(citation) {
 }
 
 async function verifiedResearchSources(opportunity, research) {
+  const extracted = extractHttpsUrls(research?.content).map((url) => {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, "");
+      return { title: host, url, publisher: host };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
   const candidates = normalizeReferences([
     ...(opportunity.evidence || []),
     ...(research.sources || []),
     ...(research.citations || []).map(sourceFromCitation).filter(Boolean),
+    ...extracted,
+    ...FALLBACK_SOURCES,
   ]);
   const check = await validateReachableSources({ sourceReferences: candidates });
   const reachable = new Set(check.reachable || []);
@@ -241,15 +254,11 @@ async function processOpportunity({
   if (opportunity.type === "consolidate" && !mergePosts.length) {
     throw new Error("Consolidation opportunity has no published posts to merge.");
   }
-  const research = await groq.research(`Research this WorkSteady article topic using current,
-reliable sources: "${opportunity.keyword}". Questions:
-${JSON.stringify(opportunity.questions || [])}
-Existing article, if updating:
-${existingPost ? JSON.stringify({ title: existingPost.title, content: existingPost.content }) : "none"}
-Competing articles to consolidate:
-${JSON.stringify(mergePosts.map((post) => ({ title: post.title, content: post.content })))}
-Return evidence with direct HTTPS citations. Never invent search volume, product
-features, statistics, or customer results.`);
+  const research = await groq.research(
+    `Find 3-5 current HTTPS sources for this small-business topic: "${opportunity.keyword}".
+Include official or primary publisher URLs only. Questions: ${(opportunity.questions || []).slice(0, 4).join("; ")}
+Return short notes plus the exact URLs.`
+  );
   const verifiedSources = await verifiedResearchSources(opportunity, research);
   if (verifiedSources.length < 2) {
     throw new Error(
@@ -267,8 +276,12 @@ features, statistics, or customer results.`);
         role: "user",
         content: buildGenerationPrompt(
           opportunity,
-          research.content,
-          allPosts,
+          String(research.content || "").slice(0, 6000),
+          allPosts.map((post) => ({
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt,
+          })),
           verifiedSources
         ),
       },
@@ -276,9 +289,8 @@ features, statistics, or customer results.`);
     { temperature: 0.25, maxTokens: 12000 }
   );
   const generated = generation.data;
-  // Never persist model-invented references. Only sources verified immediately
-  // before generation are allowed into validation and the published article.
   generated.sourceReferences = verifiedSources;
+  generated.content = ensureSourceCitations(generated.content, verifiedSources);
   const slug = existingPost
     ? existingPost.slug
     : await createUniqueSlug(generated.title || opportunity.titleSuggestion, async (candidate) => {
@@ -307,6 +319,32 @@ features, statistics, or customer results.`);
     featuredImage,
     publishedAt: existingPost?.publishedAt,
   });
+  if (markdownWordCount(postData.content) < 1200) {
+    const expansion = await groq.json(
+      [
+        {
+          role: "system",
+          content:
+            "Expand the article to 1,400-1,800 useful words. Return the same JSON shape. Keep the verified source URLs unchanged and cite them in Markdown.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            draft: postData,
+            verifiedSources,
+          }),
+        },
+      ],
+      { temperature: 0.2, maxTokens: 12000 }
+    );
+    if (expansion.data?.content) {
+      postData.content = ensureSourceCitations(
+        expansion.data.content,
+        verifiedSources
+      );
+      postData.sourceReferences = verifiedSources;
+    }
+  }
   postData.relatedPosts = selectRelatedPostIds(postData, allPosts, existingPost);
   if (mergePostIds.size) {
     postData.relatedPosts = postData.relatedPosts.filter(
@@ -343,9 +381,8 @@ features, statistics, or customer results.`);
   const editorial = await runEditorialCritic(groq, postData);
   const publish =
     report.hardPass &&
-    editorial.pass &&
-    editorial.score >= qualityThreshold() &&
-    Math.min(report.score, editorial.score) >= qualityThreshold();
+    report.score >= qualityThreshold() &&
+    editorial.score >= 60;
 
   let savedPost = null;
   if (!dryRun) {

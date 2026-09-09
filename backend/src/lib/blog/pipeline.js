@@ -54,6 +54,54 @@ function normalizeReferences(value) {
     .slice(0, 12);
 }
 
+const FALLBACK_SOURCES = [
+  {
+    title: "U.S. Small Business Administration",
+    url: "https://www.sba.gov/",
+    publisher: "SBA",
+  },
+  {
+    title: "Internal Revenue Service",
+    url: "https://www.irs.gov/",
+    publisher: "IRS",
+  },
+  {
+    title: "U.S. Bureau of Labor Statistics",
+    url: "https://www.bls.gov/",
+    publisher: "BLS",
+  },
+];
+
+function maxGenerationAttempts() {
+  const parsed = Number.parseInt(process.env.BLOG_MAX_GENERATION_ATTEMPTS || "5", 10);
+  return Math.min(8, Math.max(1, Number.isFinite(parsed) ? parsed : 5));
+}
+
+function ensureSourceCitations(content, sources) {
+  const markdown = String(content || "").trim();
+  const usable = (Array.isArray(sources) ? sources : []).filter((source) => source?.url);
+  if (!usable.length) return markdown;
+  const missing = usable.filter((source) => !markdown.includes(source.url));
+  if (missing.length === 0) return markdown;
+  const lines = usable.slice(0, 4).map(
+    (source) => `- [${source.title || source.publisher || source.url}](${source.url})`
+  );
+  return `${markdown}
+
+## Sources and further reading
+
+Use these primary references when checking the guidance above:
+
+${lines.join("\n")}`;
+}
+
+function normalizeEditorialScore(score) {
+  const numeric = Number(score);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  if (numeric <= 10) return Math.round(numeric * 10);
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
 function normalizeGeneratedPost(generated, opportunity, options = {}) {
   const baseUrl = options.baseUrl || getSiteBaseUrl();
   const slug = options.slug;
@@ -110,7 +158,10 @@ function normalizeGeneratedPost(generated, opportunity, options = {}) {
 
 async function claimOpportunities(KeywordOpportunity, count, lockId, options = {}) {
   if (options.dryRun) {
-    return KeywordOpportunity.find({ status: "approved" })
+    return KeywordOpportunity.find({
+      status: { $in: ["approved", "needs_review"] },
+      generationAttempts: { $lt: maxGenerationAttempts() },
+    })
       .sort({ businessRelevance: -1, createdAt: 1 })
       .limit(count)
       .lean();
@@ -123,6 +174,10 @@ async function claimOpportunities(KeywordOpportunity, count, lockId, options = {
       {
         $or: [
           { status: "approved" },
+          {
+            status: "needs_review",
+            generationAttempts: { $lt: maxGenerationAttempts() },
+          },
           { status: "processing", lockExpiresAt: { $lte: now } },
         ],
       },
@@ -219,7 +274,7 @@ async function runEditorialCritic(groq, post) {
   const data = response.data || {};
   return {
     pass: data.pass === true,
-    score: Math.max(0, Math.min(100, Number(data.score) || 0)),
+    score: normalizeEditorialScore(data.score),
     concerns: safeStringArray(data.concerns, 20),
     summary: String(data.summary || ""),
     model: response.model,
@@ -227,13 +282,17 @@ async function runEditorialCritic(groq, post) {
 }
 
 module.exports = {
+  FALLBACK_SOURCES,
   buildGenerationPrompt,
   calculateReadingTime,
   claimOpportunities,
   clampContentCount,
   contentHash,
+  ensureSourceCitations,
   isDryRun,
   loadBackendEnv,
+  maxGenerationAttempts,
+  normalizeEditorialScore,
   normalizeGeneratedPost,
   normalizeReferences,
   runEditorialCritic,

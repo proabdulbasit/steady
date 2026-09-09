@@ -5,7 +5,11 @@ const {
   validateReachableSources,
   validateQuality,
 } = require("../../src/lib/blog/quality");
-const { buildGenerationPrompt } = require("../../src/lib/blog/pipeline");
+const {
+  buildGenerationPrompt,
+  ensureSourceCitations,
+  normalizeEditorialScore,
+} = require("../../src/lib/blog/pipeline");
 const { buildBlogSchema } = require("../../src/lib/blog/schema");
 
 function validPost(overrides = {}) {
@@ -91,11 +95,34 @@ test("root-level article links are allowed while reserved routes stay protected"
   assert.equal(isAllowedInternalUrl("/dashboard"), false);
 });
 
+test("source validation retries GET when HEAD is blocked or missing", async () => {
+  const post = {
+    sourceReferences: [
+      { url: "https://www.sba.gov/" },
+      { url: "https://example.com/placeholder" },
+    ],
+  };
+  const result = await validateReachableSources(post, {
+    fetch: async (url, options) => {
+      if (String(url).includes("example.com")) {
+        return new Response(null, { status: 404 });
+      }
+      if (options.method === "HEAD") {
+        return new Response(null, { status: 404 });
+      }
+      return new Response("ok", { status: 200 });
+    },
+  });
+
+  assert.deepEqual(result.reachable, ["https://www.sba.gov/"]);
+  assert.match(result.broken.join(" "), /placeholder host|HTTP 404/);
+});
+
 test("source validation identifies the exact reachable URLs", async () => {
   const post = {
     sourceReferences: [
-      { url: "https://example.com/reachable" },
-      { url: "https://example.com/missing" },
+      { url: "https://www.sba.gov/reachable" },
+      { url: "https://www.sba.gov/missing" },
     ],
   };
   const result = await validateReachableSources(post, {
@@ -105,9 +132,9 @@ test("source validation identifies the exact reachable URLs", async () => {
       }),
   });
 
-  assert.deepEqual(result.reachable, ["https://example.com/reachable"]);
+  assert.deepEqual(result.reachable, ["https://www.sba.gov/reachable"]);
   assert.deepEqual(result.broken, [
-    "https://example.com/missing returned HTTP 404",
+    "https://www.sba.gov/missing returned HTTP 404",
   ]);
 });
 
@@ -128,4 +155,18 @@ test("generation prompt requires verified URLs and a safe word-count margin", ()
   assert.match(prompt, /1,400-1,800 useful words/);
   assert.match(prompt, /https:\/\/www\.sba\.gov\/cash-flow/);
   assert.match(prompt, /Use only URLs listed under/);
+});
+
+test("missing source URLs are appended as Markdown citations", () => {
+  const content = ensureSourceCitations("## Advice\n\nPay invoices weekly.", [
+    { title: "SBA", url: "https://www.sba.gov/", publisher: "SBA" },
+    { title: "IRS", url: "https://www.irs.gov/", publisher: "IRS" },
+  ]);
+  assert.match(content, /https:\/\/www\.sba\.gov\//);
+  assert.match(content, /https:\/\/www\.irs\.gov\//);
+});
+
+test("editorial scores on a 1-10 scale are normalized to 100", () => {
+  assert.equal(normalizeEditorialScore(7), 70);
+  assert.equal(normalizeEditorialScore(82), 82);
 });

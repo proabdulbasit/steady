@@ -35,6 +35,19 @@ function isSafeUrl(value, baseUrl = getSiteBaseUrl()) {
   }
 }
 
+function isPlaceholderHost(value) {
+  try {
+    const host = new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+    return /^(example\.(com|net|org)|workstead\.app)$/.test(host);
+  } catch {
+    return true;
+  }
+}
+
+function isBrokenStatus(status) {
+  return status === 404 || status === 410 || status >= 500;
+}
+
 function isAllowedInternalUrl(value, baseUrl = getSiteBaseUrl()) {
   try {
     const target = new URL(value, baseUrl);
@@ -87,33 +100,54 @@ async function validateReachableSources(post, options = {}) {
   const broken = [];
   const reachable = [];
   for (const url of urls) {
+    if (isPlaceholderHost(url)) {
+      broken.push(`${url} is a placeholder host`);
+      continue;
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const headers = { "User-Agent": "WorkSteadyEditorialBot/1.0" };
       let response = await fetchImpl(url, {
         method: "HEAD",
         redirect: "follow",
-        headers: { "User-Agent": "WorkSteadyEditorialBot/1.0" },
+        headers,
         signal: controller.signal,
       });
-      if (response.status === 405) {
+      if (isBrokenStatus(response.status) || response.status === 405 || response.status === 403) {
         response = await fetchImpl(url, {
           method: "GET",
           redirect: "follow",
-          headers: {
-            "User-Agent": "WorkSteadyEditorialBot/1.0",
-            Range: "bytes=0-0",
-          },
+          headers: { ...headers, Range: "bytes=0-1023" },
           signal: controller.signal,
         });
       }
-      if (response.status === 404 || response.status === 410 || response.status >= 500) {
+      if (isBrokenStatus(response.status)) {
         broken.push(`${url} returned HTTP ${response.status}`);
       } else {
         reachable.push(url);
       }
     } catch (error) {
-      broken.push(`${url} could not be reached (${error.name || "network error"})`);
+      try {
+        const response = await fetchImpl(url, {
+          method: "GET",
+          redirect: "follow",
+          headers: {
+            "User-Agent": "WorkSteadyEditorialBot/1.0",
+            Range: "bytes=0-1023",
+          },
+          signal: controller.signal,
+        });
+        if (isBrokenStatus(response.status)) {
+          broken.push(`${url} returned HTTP ${response.status}`);
+        } else {
+          reachable.push(url);
+        }
+      } catch (retryError) {
+        broken.push(
+          `${url} could not be reached (${retryError.name || error.name || "network error"})`
+        );
+      }
     } finally {
       clearTimeout(timer);
     }
@@ -235,6 +269,7 @@ function validateQuality(post, options = {}) {
 module.exports = {
   extractMarkdownLinks,
   isAllowedInternalUrl,
+  isPlaceholderHost,
   isSafeUrl,
   keywordDensity,
   markdownWordCount,

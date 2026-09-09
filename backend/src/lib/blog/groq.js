@@ -71,6 +71,11 @@ ${content.slice(-tailLength)}`,
   });
 }
 
+function extractHttpsUrls(text) {
+  const matches = String(text || "").match(/https:\/\/[^\s)\]>'"]+/gi) || [];
+  return [...new Set(matches.map((url) => url.replace(/[.,;:]+$/, "")))];
+}
+
 function extractSearchSources(body) {
   const message = body?.choices?.[0]?.message || {};
   const tools = [
@@ -78,18 +83,29 @@ function extractSearchSources(body) {
     ...(Array.isArray(body?.executed_tools) ? body.executed_tools : []),
   ];
   const sources = [];
+  const pushUrl = (title, url, publisher) => {
+    if (!url || !/^https:\/\//i.test(url)) return;
+    sources.push({
+      title: String(title || new URL(url).hostname),
+      url: String(url),
+      publisher: String(
+        publisher || new URL(url).hostname.replace(/^www\./, "")
+      ),
+    });
+  };
   for (const tool of tools) {
     const searchResults = Array.isArray(tool?.search_results)
       ? tool.search_results
       : tool?.search_results?.results;
     for (const result of Array.isArray(searchResults) ? searchResults : []) {
-      if (!result?.url || !/^https:\/\//i.test(result.url)) continue;
-      sources.push({
-        title: String(result.title || new URL(result.url).hostname),
-        url: String(result.url),
-        publisher: String(result.publisher || new URL(result.url).hostname.replace(/^www\./, "")),
-      });
+      pushUrl(result.title, result.url, result.publisher);
     }
+    for (const url of extractHttpsUrls(tool?.output || tool?.search_results?.answer || "")) {
+      pushUrl("", url);
+    }
+  }
+  for (const url of extractHttpsUrls(message.content)) {
+    pushUrl("", url);
   }
   return sources.filter(
     (source, index, all) =>
@@ -202,9 +218,10 @@ class GroqClient {
       } catch (error) {
         lastError = error;
         if (error.status === 413 && !options.compactAttempt) {
-          return this.chat(compactMessages(messages, 8000), {
+          return this.chat(compactMessages(messages, 6000), {
             ...options,
-            model,
+            model: options.research ? this.researchModel : model,
+            webSearch: options.research ? true : options.webSearch,
             maxTokens: Math.min(
               options.maxTokens ?? 8000,
               options.research ? 1800 : 2600
@@ -254,22 +271,36 @@ class GroqClient {
   }
 
   async research(prompt) {
-    return this.chat(
+    const messages = compactMessages(
       [
         {
           role: "system",
           content:
             "Research current facts on the web. Cite reliable primary sources with direct HTTPS URLs. Distinguish evidence from inference and never invent search-volume metrics.",
         },
-        { role: "user", content: prompt },
+        { role: "user", content: String(prompt || "").slice(0, 4000) },
       ],
-      {
+      6000
+    );
+    try {
+      return await this.chat(messages, {
         model: this.searchModel,
         research: true,
         temperature: 0.1,
-        maxTokens: 2500,
+        maxTokens: 1800,
+      });
+    } catch (error) {
+      if (error.status !== 413 && !/empty completion/i.test(error.message || "")) {
+        throw error;
       }
-    );
+      return this.chat(messages, {
+        model: this.researchModel,
+        research: true,
+        webSearch: true,
+        temperature: 0.1,
+        maxTokens: 2500,
+      });
+    }
   }
 }
 
@@ -278,6 +309,7 @@ module.exports = {
   GroqClient,
   compactMessages,
   durationToMs,
+  extractHttpsUrls,
   extractSearchSources,
   parseJsonResponse,
   retryAfterMs,

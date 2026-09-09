@@ -74,6 +74,7 @@ test("search-source extraction ignores duplicate and non-HTTPS results", () => {
   const body = {
     choices: [{
       message: {
+        content: "See https://www.sba.gov/guide for official guidance.",
         executed_tools: [{
           search_results: [
             { title: "Primary", url: "https://example.com/source" },
@@ -85,11 +86,18 @@ test("search-source extraction ignores duplicate and non-HTTPS results", () => {
     }],
   };
 
-  assert.deepEqual(extractSearchSources(body), [{
-    title: "Primary",
-    url: "https://example.com/source",
-    publisher: "example.com",
-  }]);
+  assert.deepEqual(extractSearchSources(body), [
+    {
+      title: "Primary",
+      url: "https://example.com/source",
+      publisher: "example.com",
+    },
+    {
+      title: "www.sba.gov",
+      url: "https://www.sba.gov/guide",
+      publisher: "sba.gov",
+    },
+  ]);
 });
 
 test("browser-search JSON requests omit Groq's incompatible response format", async () => {
@@ -118,6 +126,37 @@ test("browser-search JSON requests omit Groq's incompatible response format", as
   assert.deepEqual(requestBody.tools, [{ type: "browser_search" }]);
   assert.equal(requestBody.response_format, undefined);
   assert.deepEqual(result.data, { opportunities: [] });
+});
+
+test("research falls back to GPT-OSS browser search after a 413", async () => {
+  const models = [];
+  const client = new GroqClient({
+    apiKey: "test-key",
+    searchModel: "groq/compound-mini",
+    researchModel: "openai/gpt-oss-20b",
+    maxRetries: 0,
+    fetch: async (_url, options) => {
+      const body = JSON.parse(options.body);
+      models.push(body.model);
+      if (body.model === "groq/compound-mini") {
+        return new Response(
+          JSON.stringify({ error: { message: "Request Entity Too Large" } }),
+          { status: 413, headers: { "content-type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          model: body.model,
+          choices: [{ message: { content: "Use https://www.irs.gov/" } }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    },
+  });
+
+  const result = await client.research("Find official tax guidance.");
+  assert.deepEqual(models, ["groq/compound-mini", "openai/gpt-oss-20b"]);
+  assert.match(result.content, /irs\.gov/);
 });
 
 test("empty browser-search completions retry with a larger output budget", async () => {
