@@ -22,6 +22,83 @@
   box-shadow: var(--shadow-md);
 }
 
+.skeletonCard {
+  pointer-events: none;
+}
+
+.skeletonCard:hover {
+  transform: none;
+  border-color: var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+.skeletonBlock,
+.skeletonLine {
+  overflow: hidden;
+  background: linear-gradient(
+    100deg,
+    var(--bg-soft) 30%,
+    var(--bg-elev) 50%,
+    var(--bg-soft) 70%
+  );
+  background-size: 300% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+.skeletonMeta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.skeletonLine {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+}
+
+.skeletonDate {
+  width: 42%;
+}
+
+.skeletonReadTime {
+  width: 22%;
+}
+
+.skeletonTitle {
+  width: 94%;
+  height: 22px;
+  margin: 14px 0 8px;
+}
+
+.skeletonTitleShort {
+  width: 68%;
+  height: 22px;
+  margin-bottom: 14px;
+}
+
+.skeletonExcerpt {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.skeletonExcerptMid {
+  width: 78%;
+  margin-bottom: 18px;
+}
+
+.skeletonLink {
+  width: 28%;
+  height: 13px;
+  margin-top: auto;
+}
+
+@keyframes shimmer {
+  to {
+    background-position-x: -300%;
+  }
+}
+
 .imageLink {
   position: relative;
   display: block;
@@ -192,5 +269,10 @@
   .image,
   .card {
     transition: none;
+  }
+
+  .skeletonBlock,
+  .skeletonLine {
+    animation: none;
   }
 }

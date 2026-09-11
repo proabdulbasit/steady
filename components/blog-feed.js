@@ -46,6 +46,35 @@ function postHref(post) {
   return `/${encodeURIComponent(String(post.slug || "").toLowerCase())}`;
 }
 
+export function BlogCardSkeleton() {
+  return (
+    <article className={`${styles.card} ${styles.skeletonCard}`} aria-hidden="true">
+      <div className={`${styles.imageLink} ${styles.skeletonBlock}`} />
+      <div className={styles.cardBody}>
+        <div className={styles.skeletonMeta}>
+          <span className={`${styles.skeletonLine} ${styles.skeletonDate}`} />
+          <span className={`${styles.skeletonLine} ${styles.skeletonReadTime}`} />
+        </div>
+        <span className={`${styles.skeletonLine} ${styles.skeletonTitle}`} />
+        <span className={`${styles.skeletonLine} ${styles.skeletonTitleShort}`} />
+        <span className={`${styles.skeletonLine} ${styles.skeletonExcerpt}`} />
+        <span className={`${styles.skeletonLine} ${styles.skeletonExcerptMid}`} />
+        <span className={`${styles.skeletonLine} ${styles.skeletonLink}`} />
+      </div>
+    </article>
+  );
+}
+
+export function BlogCardSkeletonGrid({ count = 6 }) {
+  return (
+    <div className={styles.grid} aria-busy="true" aria-label="Loading articles">
+      {Array.from({ length: count }, (_, index) => (
+        <BlogCardSkeleton key={index} />
+      ))}
+    </div>
+  );
+}
+
 export function BlogCard({ post }) {
   const image = postImage(post);
   const date = formatPostDate(post.publishedAt);
@@ -138,6 +167,7 @@ export default function BlogFeed({ initialPosts, initialCursor }) {
       {posts.length > 0 ? (
         <div className={styles.grid}>
           {posts.map((post) => <BlogCard key={post.slug} post={post} />)}
+          {loading && [0, 1, 2].map((index) => <BlogCardSkeleton key={`loading-${index}`} />)}
         </div>
       ) : (
         <p className={styles.empty}>More practical guidance is on the way.</p>

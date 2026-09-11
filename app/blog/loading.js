@@ -1,13 +1,5 @@
-import styles from "./states.module.css";
+import { BlogCardSkeletonGrid } from "../../components/blog-feed";
 
 export default function BlogLoading() {
-  return (
-    <main className={styles.state} aria-busy="true" aria-label="Loading articles">
-      <div className={styles.skeleton}>
-        <div className={styles.skeletonLine} />
-        <div className={styles.skeletonLine} />
-        <div className={styles.skeletonCard} />
-      </div>
-    </main>
-  );
+  return <BlogCardSkeletonGrid count={6} />;
 }
