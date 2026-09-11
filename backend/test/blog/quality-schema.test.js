@@ -9,6 +9,7 @@ const {
   buildGenerationPrompt,
   ensureSourceCitations,
   normalizeEditorialScore,
+  retryableOpportunityFilter,
 } = require("../../src/lib/blog/pipeline");
 const { buildBlogSchema } = require("../../src/lib/blog/schema");
 
@@ -169,4 +170,14 @@ test("missing source URLs are appended as Markdown citations", () => {
 test("editorial scores on a 1-10 scale are normalized to 100", () => {
   assert.equal(normalizeEditorialScore(7), 70);
   assert.equal(normalizeEditorialScore(82), 82);
+});
+
+test("image credit failures stay claimable after max generation attempts", () => {
+  const filter = retryableOpportunityFilter(new Date("2026-09-11T00:00:00Z"));
+  const lastError = filter.$or.find((clause) => clause.lastError);
+  const pattern = new RegExp(lastError.lastError.$regex, lastError.lastError.$options);
+  assert.match(
+    "Image generation failed: Replicate request failed (402): You have insufficient credit to run this model.",
+    pattern
+  );
 });

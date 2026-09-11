@@ -156,12 +156,30 @@ function normalizeGeneratedPost(generated, opportunity, options = {}) {
   return post;
 }
 
+function retryableOpportunityFilter(now = new Date()) {
+  return {
+    $or: [
+      { status: "approved" },
+      {
+        status: "needs_review",
+        generationAttempts: { $lt: maxGenerationAttempts() },
+      },
+      {
+        status: "needs_review",
+        lastError: {
+          $regex:
+            "insufficient credit|featured image|Image generation failed|Replicate request failed \\(402\\)",
+          $options: "i",
+        },
+      },
+      { status: "processing", lockExpiresAt: { $lte: now } },
+    ],
+  };
+}
+
 async function claimOpportunities(KeywordOpportunity, count, lockId, options = {}) {
   if (options.dryRun) {
-    return KeywordOpportunity.find({
-      status: { $in: ["approved", "needs_review"] },
-      generationAttempts: { $lt: maxGenerationAttempts() },
-    })
+    return KeywordOpportunity.find(retryableOpportunityFilter())
       .sort({ businessRelevance: -1, createdAt: 1 })
       .limit(count)
       .lean();
@@ -171,16 +189,7 @@ async function claimOpportunities(KeywordOpportunity, count, lockId, options = {
   const lockExpiresAt = new Date(now.getTime() + (options.lockMinutes || 45) * 60000);
   for (let index = 0; index < count; index += 1) {
     const item = await KeywordOpportunity.findOneAndUpdate(
-      {
-        $or: [
-          { status: "approved" },
-          {
-            status: "needs_review",
-            generationAttempts: { $lt: maxGenerationAttempts() },
-          },
-          { status: "processing", lockExpiresAt: { $lte: now } },
-        ],
-      },
+      retryableOpportunityFilter(now),
       {
         $set: { status: "processing", lockId, lockedAt: now, lockExpiresAt },
         $inc: { generationAttempts: 1 },
@@ -296,5 +305,6 @@ module.exports = {
   normalizeGeneratedPost,
   normalizeReferences,
   runEditorialCritic,
+  retryableOpportunityFilter,
   safeStringArray,
 };

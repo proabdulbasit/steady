@@ -105,7 +105,7 @@ async function uploadCloudinary(sourceUrl, publicId, options = {}) {
   const parameters = {
     folder: "worksteady/blog",
     format: "webp",
-    overwrite: "false",
+    overwrite: options.overwrite ? "true" : "false",
     public_id: publicId,
     timestamp,
   };
@@ -133,39 +133,98 @@ async function uploadCloudinary(sourceUrl, publicId, options = {}) {
   };
 }
 
+function escapeXml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildFallbackSvg({ title, category }) {
+  const heading = escapeXml(String(title || "WorkSteady").slice(0, 72));
+  const label = escapeXml(String(category || "Small business guidance").slice(0, 48));
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#1c1917"/>
+  <rect x="72" y="72" width="1456" height="756" rx="28" fill="#f4efe6"/>
+  <text x="120" y="180" fill="#6b6258" font-family="Georgia, serif" font-size="28">${label}</text>
+  <text x="120" y="320" fill="#1c1917" font-family="Georgia, serif" font-size="56">${heading}</text>
+  <text x="120" y="760" fill="#6b6258" font-family="Georgia, serif" font-size="28">WorkSteady</text>
+</svg>`;
+}
+
+async function fallbackFeaturedImage({
+  alt,
+  slug,
+  title,
+  category,
+  fetch,
+}) {
+  const svg = buildFallbackSvg({ title, category });
+  const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+  const uploaded = await uploadCloudinary(dataUri, `fallback-${slug}`, {
+    fetch,
+    overwrite: true,
+  });
+  return {
+    ...uploaded,
+    alt: alt || `${title || "WorkSteady article"} featured image`,
+    provider: "cloudinary-fallback",
+    sourceId: `fallback:${uploaded.sourceId}`,
+    prompt: "",
+    promptFingerprint: promptFingerprint(`fallback:${slug}`),
+  };
+}
+
 async function generateFeaturedImage({
   prompt,
   alt,
   slug,
+  title,
+  category,
   usedFingerprints = new Set(),
   usedSourceIds = new Set(),
   fetch,
 }) {
-  if (!String(prompt || "").trim()) throw new Error("An image prompt is required.");
-  const fingerprint = promptFingerprint(prompt);
-  if (usedFingerprints.has(fingerprint)) throw new Error("Duplicate image prompt rejected.");
-  const generated = await replicateFlux(prompt, { fetch });
-  if (usedSourceIds.has(generated.sourceId)) {
-    throw new Error("Duplicate image source rejected.");
+  const safeAlt = alt || `${title || slug} featured image`;
+  let generationError;
+  if (String(prompt || "").trim()) {
+    try {
+      const fingerprint = promptFingerprint(prompt);
+      if (usedFingerprints.has(fingerprint)) throw new Error("Duplicate image prompt rejected.");
+      const generated = await replicateFlux(prompt, { fetch });
+      if (usedSourceIds.has(generated.sourceId)) {
+        throw new Error("Duplicate image source rejected.");
+      }
+      const uploaded = await uploadCloudinary(
+        generated.url,
+        `${slug}-${fingerprint.slice(0, 12)}`,
+        { fetch }
+      );
+      return {
+        ...uploaded,
+        alt: safeAlt,
+        provider: "replicate-flux+cloudinary",
+        sourceId: `${generated.sourceId}:${uploaded.sourceId}`,
+        prompt,
+        promptFingerprint: fingerprint,
+      };
+    } catch (error) {
+      generationError = error;
+    }
   }
-  const uploaded = await uploadCloudinary(
-    generated.url,
-    `${slug}-${fingerprint.slice(0, 12)}`,
-    { fetch }
-  );
-  return {
-    ...uploaded,
-    alt,
-    provider: "replicate-flux+cloudinary",
-    sourceId: `${generated.sourceId}:${uploaded.sourceId}`,
-    prompt,
-    promptFingerprint: fingerprint,
-  };
+  try {
+    return await fallbackFeaturedImage({ alt: safeAlt, slug, title, category, fetch });
+  } catch (fallbackError) {
+    throw generationError || fallbackError;
+  }
 }
 
 module.exports = {
+  buildFallbackSvg,
   cloudinarySignature,
   deriveVariants,
+  fallbackFeaturedImage,
   generateFeaturedImage,
   parseCloudinaryUrl,
   promptFingerprint,

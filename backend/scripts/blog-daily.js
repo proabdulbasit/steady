@@ -308,6 +308,8 @@ Return short notes plus the exact URLs.`
       prompt: generated.imagePrompt,
       alt: generated.imageAlt,
       slug,
+      title: generated.title || opportunity.titleSuggestion,
+      category: generated.category || opportunity.cluster,
       usedFingerprints,
       usedSourceIds,
     });
@@ -554,7 +556,16 @@ async function runDaily(options = {}) {
 
 if (require.main === module) {
   runDaily()
-    .then((result) => console.log(JSON.stringify(result, null, 2)))
+    .then((result) => {
+      console.log(JSON.stringify(result, null, 2));
+      const published = (result.results || []).filter((item) => item.publish).length;
+      if (!result.dryRun && published === 0) {
+        console.error(
+          "[blog-daily] No posts were published. The daily workflow must publish at least one article."
+        );
+        process.exitCode = 1;
+      }
+    })
     .catch((error) => {
       console.error("[blog-daily]", error);
       process.exitCode = 1;

@@ -3,7 +3,7 @@ import { getBlogPosts } from "../../lib/blog-server";
 import styles from "./blog.module.css";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 900;
+export const revalidate = 0;
 
 export const metadata = {
   title: "Small Business Advice",
@@ -61,20 +61,22 @@ export default async function BlogPage() {
         </section>
       )}
 
-      <section className={styles.section} aria-labelledby="latest-heading">
-        <div className="container">
-          <div className={styles.sectionHead}>
-            <div>
-              <div className="eyebrow">Latest articles</div>
-              <h2 className={styles.sectionTitle} id="latest-heading">Keep your business moving.</h2>
+      {remaining.length > 0 && (
+        <section className={styles.section} aria-labelledby="latest-heading">
+          <div className="container">
+            <div className={styles.sectionHead}>
+              <div>
+                <div className="eyebrow">Latest articles</div>
+                <h2 className={styles.sectionTitle} id="latest-heading">Keep your business moving.</h2>
+              </div>
+              <p className={styles.sectionCopy}>
+                Fresh, focused guidance on the decisions small business owners face every day.
+              </p>
             </div>
-            <p className={styles.sectionCopy}>
-              Fresh, focused guidance on the decisions small business owners face every day.
-            </p>
+            <BlogFeed initialPosts={remaining} initialCursor={nextCursor} />
           </div>
-          <BlogFeed initialPosts={remaining} initialCursor={nextCursor} />
-        </div>
-      </section>
+        </section>
+      )}
     </main>
   );
 }
