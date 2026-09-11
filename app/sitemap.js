@@ -4,7 +4,6 @@ import {
   getBlogSitemap,
 } from "../lib/blog-server";
 
-export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 function sitemapDate(...values) {
@@ -13,6 +12,23 @@ function sitemapDate(...values) {
     if (!Number.isNaN(date.getTime())) return date;
   }
   return new Date();
+}
+
+async function blogArticleRoutes() {
+  try {
+    const posts = await getBlogSitemap();
+    return (Array.isArray(posts) ? posts : [])
+      .filter((post) => post?.slug)
+      .map((post) => ({
+        url: canonicalPostUrl(post),
+        lastModified: sitemapDate(post.updatedAt, post.publishedAt),
+        changeFrequency: "weekly",
+        priority: 0.7,
+      }));
+  } catch (error) {
+    console.error("[sitemap] Skipping article URLs:", error?.message || error);
+    return [];
+  }
 }
 
 export default async function sitemap() {
@@ -30,15 +46,5 @@ export default async function sitemap() {
     priority: route.priority,
   }));
 
-  const posts = await getBlogSitemap();
-  const articleRoutes = posts
-    .filter((post) => post?.slug)
-    .map((post) => ({
-      url: canonicalPostUrl(post),
-      lastModified: sitemapDate(post.updatedAt, post.publishedAt),
-      changeFrequency: "weekly",
-      priority: 0.7,
-    }));
-
-  return [...staticRoutes, ...articleRoutes];
+  return [...staticRoutes, ...(await blogArticleRoutes())];
 }
