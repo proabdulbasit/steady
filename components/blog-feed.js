@@ -5,17 +5,17 @@ import Image from "next/image";
 import Link from "next/link";
 import styles from "./blog-feed.module.css";
 
-function formatDate(value) {
+export function formatPostDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("en-US", {
-    month: "short",
+    month: "long",
     day: "numeric",
     year: "numeric",
   }).format(date);
 }
 
-function imageProps(post) {
+export function postImage(post) {
   const image =
     post?.featuredImage && typeof post.featuredImage === "object"
       ? post.featuredImage
@@ -42,51 +42,64 @@ function readingTime(value) {
   return typeof value === "number" ? `${value} min read` : value;
 }
 
-export function BlogCard({ post, featured = false }) {
-  const image = imageProps(post);
-  const date = formatDate(post.publishedAt);
-  const href = `/${encodeURIComponent(String(post.slug || "").toLowerCase())}`;
+function postHref(post) {
+  return `/${encodeURIComponent(String(post.slug || "").toLowerCase())}`;
+}
+
+export function BlogCard({ post }) {
+  const image = postImage(post);
+  const date = formatPostDate(post.publishedAt);
+  const href = postHref(post);
 
   return (
-    <article className={featured ? styles.featuredCard : styles.card}>
-      <Link
-        href={href}
-        className={featured ? styles.featuredImageLink : styles.imageLink}
-        aria-label={`Read ${post.title}`}
-      >
+    <article className={styles.card}>
+      <Link href={href} className={styles.imageLink} aria-label={`Read ${post.title}`}>
         {image ? (
           <Image
             {...image}
             className={styles.image}
-            sizes={featured ? "(max-width: 860px) 100vw, 56vw" : "(max-width: 760px) 100vw, 33vw"}
-            priority={featured}
+            sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw"
           />
         ) : (
           <span className={styles.imageFallback} aria-hidden="true">W</span>
         )}
+        {post.category && <span className={styles.imageBadge}>{post.category}</span>}
       </Link>
 
-      <div className={featured ? styles.featuredBody : styles.cardBody}>
+      <div className={styles.cardBody}>
         <div className={styles.meta}>
-          {post.category && <span className={styles.category}>{post.category}</span>}
           {date && <time dateTime={post.publishedAt}>{date}</time>}
           {post.readingTime && <span>{readingTime(post.readingTime)}</span>}
         </div>
-        {featured ? (
-          <h2 className={styles.featuredTitle}>
-            <Link href={href}>{post.title}</Link>
-          </h2>
-        ) : (
-          <h3 className={styles.cardTitle}>
-            <Link href={href}>{post.title}</Link>
-          </h3>
-        )}
+        <h3 className={styles.cardTitle}>
+          <Link href={href}>{post.title}</Link>
+        </h3>
         {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
-        <Link href={href} className={styles.readLink} aria-label={`Read ${post.title}`}>
-          Read article <span aria-hidden="true">→</span>
+        <Link href={href} className={styles.readLink}>
+          Read more <span aria-hidden="true">→</span>
         </Link>
       </div>
     </article>
+  );
+}
+
+export function TrendingPost({ post }) {
+  const image = postImage(post);
+  const href = postHref(post);
+
+  return (
+    <Link href={href} className={styles.trendingItem}>
+      {image ? (
+        <Image
+          {...image}
+          className={styles.trendingImage}
+          sizes="72px"
+        />
+      ) : (
+        <span className={styles.trendingFallback} aria-hidden="true">W</span>
+      )}
+      <span className={styles.trendingTitle}>{post.title}</span>
+    </Link>
   );
 }
 
@@ -113,7 +126,7 @@ export default function BlogFeed({ initialPosts, initialCursor }) {
         ? data.posts.filter((post) => post?.slug && !seen.has(post.slug))
         : [];
       setPosts((current) => [...current, ...additions]);
-      setCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
+      setCursor(typeof data.nextCursor === "string" ? data.nextCursor : data.pageInfo?.nextCursor || null);
     } catch {
       setError("More articles could not be loaded. Please try again.");
     } finally {
@@ -140,7 +153,7 @@ export default function BlogFeed({ initialPosts, initialCursor }) {
             onClick={loadMore}
             disabled={loading}
           >
-            {loading ? "Loading…" : "Load more articles"}
+            {loading ? "Loading…" : "Next"}
           </button>
         )}
       </div>

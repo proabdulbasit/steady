@@ -3,11 +3,12 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { BlogCard } from "../../components/blog-feed";
+import { TrendingPost } from "../../components/blog-feed";
 import {
   BlogNotFoundError,
   canonicalPostUrl,
   getBlogPost,
+  getBlogPosts,
   normalizeSlug,
 } from "../../lib/blog-server";
 import styles from "./article.module.css";
@@ -218,7 +219,10 @@ export default async function ArticlePage({ params, searchParams }) {
     permanentRedirect(`/${encodeURIComponent(normalized)}`);
   }
 
-  const post = await loadArticle(slug);
+  const [post, listing] = await Promise.all([
+    loadArticle(slug),
+    getBlogPosts({ limit: 8 }).catch(() => ({ posts: [] })),
+  ]);
   const author = authorDetails(post);
   const image = imageDetails(post);
   const sources = sourceDetails(post);
@@ -227,8 +231,14 @@ export default async function ArticlePage({ params, searchParams }) {
   const publishedIso = validDate(post.publishedAt)?.toISOString();
   const modifiedIso = validDate(post.updatedAt || post.modifiedAt)?.toISOString();
   const related = (Array.isArray(post.relatedPosts) ? post.relatedPosts : [])
+    .filter((item) => item?.slug && item?.title && normalizeSlug(item.slug) !== normalized);
+  const trending = [
+    ...related,
+    ...(Array.isArray(listing.posts) ? listing.posts : []),
+  ]
     .filter((item) => item?.slug && item?.title && normalizeSlug(item.slug) !== normalized)
-    .slice(0, 3);
+    .filter((item, index, all) => all.findIndex((entry) => entry.slug === item.slug) === index)
+    .slice(0, 5);
 
   const articleJsonLd = {
     "@context": "https://schema.org",
@@ -288,130 +298,120 @@ export default async function ArticlePage({ params, searchParams }) {
   return (
     <main className={styles.main}>
       <article className={styles.article}>
-        <header className={styles.header}>
-          <nav className={styles.breadcrumbs} aria-label="Breadcrumb">
-            <Link href="/">Home</Link>
-            <span aria-hidden="true">/</span>
-            <Link href="/blog">Blog</Link>
-            <span aria-hidden="true">/</span>
-            <span className={styles.breadcrumbCurrent} aria-current="page">{post.title}</span>
-          </nav>
-          {post.category && <div className={`eyebrow ${styles.category}`}>{post.category}</div>}
-          <h1 className={styles.title}>{post.title}</h1>
-          {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
-          <div className={styles.byline}>
-            <span>By <strong>{author.name}</strong></span>
-            {publishedIso && (
-              <span>
-                Published <time dateTime={publishedIso}>{formatDate(post.publishedAt)}</time>
-              </span>
-            )}
-            {modifiedIso && modifiedIso !== publishedIso && (
-              <span>
-                Updated <time dateTime={modifiedIso}>{formatDate(post.updatedAt || post.modifiedAt)}</time>
-              </span>
-            )}
-            {post.readingTime && <span>{readingTime(post.readingTime)}</span>}
-          </div>
-        </header>
+        <div className={`container ${styles.layout}`}>
+          <Link href="/blog" className={styles.backLink}>
+            <span aria-hidden="true">←</span> Back to Blog
+          </Link>
 
-        {image && (
-          <Image
-            src={image.url}
-            alt={image.alt}
-            width={image.width}
-            height={image.height}
-            className={styles.heroImage}
-            sizes="(max-width: 1168px) calc(100vw - 48px), 1120px"
-            priority
-          />
-        )}
-
-        <div className={styles.bodyGrid}>
-          <div className={styles.prose}>
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                h1: ({ node: _node, ...props }) => <h2 {...props} />,
-                a: ({ node: _node, href, ...props }) => {
-                  const normalizedHref = articleHref(href);
-                  const external =
-                    typeof normalizedHref === "string" &&
-                    /^https?:\/\//i.test(normalizedHref);
-                  return (
-                    <a
-                      href={normalizedHref}
-                      {...props}
-                      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                    />
-                  );
-                },
-              }}
-            >
-              {content}
-            </ReactMarkdown>
-          </div>
-
-          <aside className={styles.aside} aria-label="Editorial disclosure">
-            <span className={styles.asideLabel}>How this was made</span>
-            This article was generated and published through WorkSteady&apos;s automated
-            editorial workflow. Review the cited sources and use professional judgment
-            before acting on legal, tax, or financial topics.
-          </aside>
-        </div>
-
-        {sources.length > 0 && (
-          <section className={styles.references} aria-labelledby="sources-heading">
-            <h2 className={styles.referencesTitle} id="sources-heading">Sources</h2>
-            <ol className={styles.sourceList}>
-              {sources.map((source) => (
-                <li key={source.url}>
-                  <a
-                    className={styles.sourceLink}
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {source.title}
-                  </a>
-                  {source.publisher && (
-                    <span className={styles.sourcePublisher}> — {source.publisher}</span>
+          <div className={styles.grid}>
+            <div className={styles.primary}>
+              <header className={styles.header}>
+                {post.category && <div className={`eyebrow ${styles.category}`}>{post.category}</div>}
+                <h1 className={styles.title}>{post.title}</h1>
+                <div className={styles.byline}>
+                  {publishedIso && (
+                    <time dateTime={publishedIso}>{formatDate(post.publishedAt)}</time>
                   )}
-                </li>
-              ))}
-            </ol>
-          </section>
-        )}
+                  {post.readingTime && <span>{readingTime(post.readingTime)}</span>}
+                  <span>By {author.name}</span>
+                </div>
+              </header>
 
-        <section className={`cta-band ${styles.cta}`} aria-labelledby="article-cta-heading">
-          <div className={styles.ctaInner}>
-            <div>
-              <div className="eyebrow">Your next move</div>
-              <h2 className={styles.ctaTitle} id="article-cta-heading">
-                Get a direct answer for your business.
-              </h2>
-              <p className={styles.ctaCopy}>
-                Tell WorkSteady what is happening and get one practical action you can take today.
+              {image && (
+                <Image
+                  src={image.url}
+                  alt={image.alt}
+                  width={image.width}
+                  height={image.height}
+                  className={styles.heroImage}
+                  sizes="(max-width: 960px) calc(100vw - 48px), 760px"
+                  priority
+                />
+              )}
+
+              <div className={styles.prose}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({ node: _node, ...props }) => <h2 {...props} />,
+                    a: ({ node: _node, href, ...props }) => {
+                      const normalizedHref = articleHref(href);
+                      const external =
+                        typeof normalizedHref === "string" &&
+                        /^https?:\/\//i.test(normalizedHref);
+                      return (
+                        <a
+                          href={normalizedHref}
+                          {...props}
+                          {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                        />
+                      );
+                    },
+                  }}
+                >
+                  {content}
+                </ReactMarkdown>
+              </div>
+
+              {sources.length > 0 && (
+                <section className={styles.references} aria-labelledby="sources-heading">
+                  <h2 className={styles.referencesTitle} id="sources-heading">Sources</h2>
+                  <ol className={styles.sourceList}>
+                    {sources.map((source) => (
+                      <li key={source.url}>
+                        <a
+                          className={styles.sourceLink}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {source.title}
+                        </a>
+                        {source.publisher && (
+                          <span className={styles.sourcePublisher}> — {source.publisher}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              )}
+
+              <p className={styles.disclosure}>
+                This article was generated through WorkSteady&apos;s editorial workflow.
+                Review the cited sources before acting on legal, tax, or financial topics.
               </p>
             </div>
-            <Link href="/chat" className="btn btn-primary">Ask WorkSteady →</Link>
+
+            {trending.length > 0 && (
+              <aside className={styles.sidebar} aria-labelledby="trending-heading">
+                <h2 className={styles.sidebarTitle} id="trending-heading">Trending Posts</h2>
+                <div className={styles.trendingList}>
+                  {trending.map((item) => (
+                    <TrendingPost key={item.slug} post={item} />
+                  ))}
+                </div>
+              </aside>
+            )}
+          </div>
+        </div>
+
+        <section className={`container ${styles.ctaWrap}`} aria-labelledby="article-cta-heading">
+          <div className={`cta-band ${styles.cta}`}>
+            <div className={styles.ctaInner}>
+              <div>
+                <div className="eyebrow">Your next move</div>
+                <h2 className={styles.ctaTitle} id="article-cta-heading">
+                  Get a direct answer for your business.
+                </h2>
+                <p className={styles.ctaCopy}>
+                  Tell WorkSteady what is happening and get one practical action you can take today.
+                </p>
+              </div>
+              <Link href="/chat" className="btn btn-primary">Ask WorkSteady →</Link>
+            </div>
           </div>
         </section>
       </article>
-
-      {related.length > 0 && (
-        <section className={styles.related} aria-labelledby="related-heading">
-          <div className="container">
-            <div className={styles.relatedHead}>
-              <div className="eyebrow">Keep reading</div>
-              <h2 className={styles.relatedTitle} id="related-heading">Related guidance</h2>
-            </div>
-            <div className={styles.relatedGrid}>
-              {related.map((item) => <BlogCard key={item.slug} post={item} />)}
-            </div>
-          </div>
-        </section>
-      )}
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(articleJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }} />

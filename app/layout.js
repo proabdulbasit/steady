@@ -14,6 +14,9 @@ export const metadata = {
   authors: [{ name: "WorkSteady" }],
   creator: "WorkSteady",
   publisher: "WorkSteady",
+  verification: {
+    google: "Voum7juu4mnUgw5Lmi2sb3Bj-jOEHkZfxIooPhgqPBA",
+  },
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",

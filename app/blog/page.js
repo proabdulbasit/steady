@@ -1,4 +1,4 @@
-import BlogFeed, { BlogCard } from "../../components/blog-feed";
+import BlogFeed from "../../components/blog-feed";
 import { getBlogPosts } from "../../lib/blog-server";
 import styles from "./blog.module.css";
 
@@ -26,13 +26,8 @@ export const metadata = {
 };
 
 export default async function BlogPage() {
-  const { posts, nextCursor } = await getBlogPosts({ limit: 10 });
+  const { posts, nextCursor } = await getBlogPosts({ limit: 9 });
   const validPosts = posts.filter((post) => post?.slug && post?.title);
-  const featured =
-    validPosts.find((post) => post.featured === true) || validPosts[0] || null;
-  const remaining = featured
-    ? validPosts.filter((post) => post.slug !== featured.slug)
-    : validPosts;
 
   return (
     <main className={styles.main}>
@@ -40,43 +35,21 @@ export default async function BlogPage() {
         <div className="container">
           <div className={styles.heroInner}>
             <div className={`eyebrow ${styles.eyebrow}`}>The WorkSteady journal</div>
-            <h1 className={styles.title}>
-              Practical answers for{" "}
-              <span className={styles.titleAccent}>real business owners.</span>
-            </h1>
+            <h1 className={styles.title}>Insights &amp; articles</h1>
             <p className={styles.lede}>
-              No corporate filler. Just useful guidance, grounded sources, and a clear
-              next move for the people doing the work.
+              Practical guidance for small-business owners—from cash flow and hiring
+              to the decisions you make every day.
             </p>
           </div>
         </div>
       </section>
 
-      {featured && (
-        <section className={styles.featuredSection} aria-labelledby="featured-heading">
-          <div className="container">
-            <div className="eyebrow" id="featured-heading">Featured guidance</div>
-            <BlogCard post={featured} featured />
-          </div>
-        </section>
-      )}
-
-      {remaining.length > 0 && (
-        <section className={styles.section} aria-labelledby="latest-heading">
-          <div className="container">
-            <div className={styles.sectionHead}>
-              <div>
-                <div className="eyebrow">Latest articles</div>
-                <h2 className={styles.sectionTitle} id="latest-heading">Keep your business moving.</h2>
-              </div>
-              <p className={styles.sectionCopy}>
-                Fresh, focused guidance on the decisions small business owners face every day.
-              </p>
-            </div>
-            <BlogFeed initialPosts={remaining} initialCursor={nextCursor} />
-          </div>
-        </section>
-      )}
+      <section className={styles.section} aria-labelledby="latest-heading">
+        <div className="container">
+          <h2 className={styles.srOnly} id="latest-heading">Latest articles</h2>
+          <BlogFeed initialPosts={validPosts} initialCursor={nextCursor} />
+        </div>
+      </section>
     </main>
   );
 }
