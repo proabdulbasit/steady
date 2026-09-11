@@ -310,6 +310,7 @@ Return short notes plus the exact URLs.`
       slug,
       title: generated.title || opportunity.titleSuggestion,
       category: generated.category || opportunity.cluster,
+      keyword: generated.primaryKeyword || opportunity.keyword,
       usedFingerprints,
       usedSourceIds,
     });

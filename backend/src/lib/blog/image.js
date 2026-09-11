@@ -133,6 +133,283 @@ async function uploadCloudinary(sourceUrl, publicId, options = {}) {
   };
 }
 
+const IMAGE_PROMPT_NOISE =
+  /photorealistic|cinematic|editorial|hyper[- ]real|16:9|aspect ratio|no text|no logos?|brand[- ]safe|studio lighting|bokeh|dslr|4k|ultra detailed|shot on|prompt|camera|lens/gi;
+const TOPIC_STOP_WORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "that",
+  "this",
+  "into",
+  "your",
+  "their",
+  "small",
+  "business",
+  "businesses",
+  "owner",
+  "owners",
+  "practical",
+  "guide",
+  "using",
+  "image",
+  "photo",
+  "photograph",
+  "article",
+]);
+
+const UNSPLASH_CATALOG = [
+  {
+    id: "photo-1554224155-6726b3ff858f",
+    url: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Calculator, receipts, and a notebook on a finance desk",
+    tags: ["finance", "invoice", "invoicing", "cash", "accounting", "bookkeeping", "tax", "money", "budget"],
+  },
+  {
+    id: "photo-1553729459-efe14ef6055d",
+    url: "https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Hands counting cash next to a calculator",
+    tags: ["cash", "flow", "money", "payments", "revenue", "collections", "forecast"],
+  },
+  {
+    id: "photo-1460925895917-afdab827c52f",
+    url: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Laptop showing charts and financial analytics",
+    tags: ["forecast", "analytics", "dashboard", "ai", "cash", "planning", "budget", "finance"],
+  },
+  {
+    id: "photo-1553413077-190dd305871c",
+    url: "https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Warehouse aisles stacked with inventory",
+    tags: ["inventory", "warehouse", "stock", "retail", "logistics", "supply", "jit"],
+  },
+  {
+    id: "photo-1586528116311-ad8dd3c8310d",
+    url: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Warehouse worker reviewing stock on pallet racks",
+    tags: ["inventory", "warehouse", "retail", "fulfillment", "shipping", "stock"],
+  },
+  {
+    id: "photo-1441986300917-64674bd600d8",
+    url: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Clothing hanging in a small retail shop",
+    tags: ["retail", "store", "shop", "inventory", "merchandising", "customer"],
+  },
+  {
+    id: "photo-1522071820081-009f0129c71c",
+    url: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Team collaborating around a table with laptops",
+    tags: ["team", "remote", "collaboration", "meeting", "hiring", "management"],
+  },
+  {
+    id: "photo-1600880292203-757bb62b4baf",
+    url: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "People on a video call in a bright office",
+    tags: ["remote", "team", "video", "hybrid", "management", "meeting"],
+  },
+  {
+    id: "photo-1586281380349-632531db7ed4",
+    url: "https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Person working on a laptop at a home desk",
+    tags: ["remote", "laptop", "home", "office", "productivity", "work"],
+  },
+  {
+    id: "photo-1450101499163-c8848c66ca85",
+    url: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Hands signing a stack of business documents",
+    tags: ["compliance", "legal", "documents", "checklist", "contract", "policy"],
+  },
+  {
+    id: "photo-1454165804606-c3d57bc86b40",
+    url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Notebook, laptop, and coffee during a planning session",
+    tags: ["planning", "operations", "checklist", "strategy", "management", "desk"],
+  },
+  {
+    id: "photo-1542744173-8e7e53415bb0",
+    url: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Team meeting in a conference room",
+    tags: ["meeting", "leadership", "hiring", "team", "management", "office"],
+  },
+  {
+    id: "photo-1556740738-b6a63e27c4df",
+    url: "https://images.unsplash.com/photo-1556740738-b6a63e27c4df?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Customer paying at a small cafe counter",
+    tags: ["customer", "retail", "payments", "sales", "service", "store"],
+  },
+  {
+    id: "photo-1486312338219-ce68d2c6f44d",
+    url: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Close-up of hands typing on a laptop",
+    tags: ["laptop", "software", "ai", "automation", "productivity", "office"],
+  },
+  {
+    id: "photo-1497366216548-37526070297c",
+    url: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Sunlit office with desks and plants",
+    tags: ["office", "workplace", "operations", "space", "studio"],
+  },
+];
+
+function collectTopicTerms({ title, category, prompt, keyword } = {}) {
+  const text = [keyword, title, category, String(prompt || "").replace(IMAGE_PROMPT_NOISE, " ")]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ");
+  return [...new Set(text.split(/\s+/).filter((word) => word.length > 2 && !TOPIC_STOP_WORDS.has(word)))];
+}
+
+function buildUnsplashQueries({ title, category, prompt, keyword } = {}) {
+  const terms = collectTopicTerms({ title, category, prompt, keyword });
+  const queries = [];
+  if (keyword) queries.push(`${String(keyword).trim()} small business`);
+  if (title) queries.push(`${String(title).trim()} workplace`);
+  if (terms.length) queries.push(`${terms.slice(0, 5).join(" ")} small business`);
+  if (category) queries.push(`${String(category).trim()} small business office`);
+  queries.push("small business workplace desk");
+  return [...new Set(queries.map((query) => query.replace(/\s+/g, " ").trim()).filter(Boolean))];
+}
+
+function scorePhotoTags(tags, terms) {
+  const haystack = (Array.isArray(tags) ? tags : []).join(" ").toLowerCase();
+  return terms.reduce((score, term) => score + (haystack.includes(term) ? 1 : 0), 0);
+}
+
+function pickCuratedUnsplashPhoto({ title, category, prompt, keyword, usedSourceIds = new Set() } = {}) {
+  const terms = collectTopicTerms({ title, category, prompt, keyword });
+  const ranked = UNSPLASH_CATALOG
+    .filter((photo) => !usedSourceIds.has(photo.id))
+    .map((photo) => ({ photo, score: scorePhotoTags(photo.tags, terms) }))
+    .sort((left, right) => right.score - left.score || left.photo.id.localeCompare(right.photo.id));
+  const best = ranked.find((entry) => entry.score > 0) || ranked[0];
+  if (!best) throw new Error("No unused Unsplash catalog photo remained.");
+  return best.photo;
+}
+
+function unsplashAccessKey(options = {}) {
+  if (options.accessKey !== undefined) return String(options.accessKey || "");
+  return process.env.UNSPLASH_ACCESS_KEY || "";
+}
+
+function unsplashHeaders(accessKey) {
+  return {
+    Accept: "application/json",
+    Authorization: `Client-ID ${accessKey}`,
+  };
+}
+
+function normalizeUnsplashPhoto(photo) {
+  const raw = photo?.urls?.raw || photo?.urls?.full || photo?.urls?.regular || "";
+  if (!photo?.id || !raw) return null;
+  const url = new URL(raw);
+  url.searchParams.set("auto", "format");
+  url.searchParams.set("fit", "crop");
+  url.searchParams.set("w", "1600");
+  url.searchParams.set("h", "900");
+  url.searchParams.set("q", "80");
+  const tags = [
+    ...(Array.isArray(photo.tags) ? photo.tags.map((tag) => tag.title || tag) : []),
+    photo.alt_description,
+    photo.description,
+  ]
+    .map((value) => String(value || "").toLowerCase())
+    .filter(Boolean);
+  return {
+    id: photo.id,
+    url: url.toString(),
+    alt: photo.alt_description || photo.description || "",
+    tags,
+    downloadLocation: photo.links?.download_location || "",
+  };
+}
+
+async function searchUnsplashPhotos(query, { fetch, accessKey, usedSourceIds = new Set() } = {}) {
+  const key = unsplashAccessKey({ accessKey });
+  if (!key) throw new Error("Missing UNSPLASH_ACCESS_KEY.");
+  const fetchImpl = fetch || global.fetch;
+  const endpoint = new URL("https://api.unsplash.com/search/photos");
+  endpoint.searchParams.set("query", query);
+  endpoint.searchParams.set("orientation", "landscape");
+  endpoint.searchParams.set("content_filter", "high");
+  endpoint.searchParams.set("per_page", "8");
+  const response = await fetchImpl(endpoint, { headers: unsplashHeaders(key) });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Unsplash search failed (${response.status}): ${body.errors?.[0] || response.statusText}`);
+  }
+  const photos = (body.results || []).map(normalizeUnsplashPhoto).filter(Boolean);
+  const unused = photos.filter((photo) => !usedSourceIds.has(photo.id));
+  const terms = collectTopicTerms({ prompt: query });
+  unused.sort((left, right) => scorePhotoTags(right.tags, terms) - scorePhotoTags(left.tags, terms));
+  return unused[0] || null;
+}
+
+async function selectUnsplashPhoto({
+  title,
+  category,
+  prompt,
+  keyword,
+  usedSourceIds = new Set(),
+  fetch,
+  accessKey,
+} = {}) {
+  const key = unsplashAccessKey({ accessKey });
+  if (key) {
+    const queries = buildUnsplashQueries({ title, category, prompt, keyword });
+    for (const query of queries) {
+      try {
+        const photo = await searchUnsplashPhotos(query, { fetch, accessKey: key, usedSourceIds });
+        if (photo) return photo;
+      } catch {
+        // Try the next, more general query before using the curated catalog.
+      }
+    }
+  }
+  return pickCuratedUnsplashPhoto({ title, category, prompt, keyword, usedSourceIds });
+}
+
+async function unsplashFeaturedImage({
+  alt,
+  slug,
+  title,
+  category,
+  prompt,
+  keyword,
+  usedSourceIds = new Set(),
+  fetch,
+  accessKey,
+}) {
+  const photo = await selectUnsplashPhoto({
+    title,
+    category,
+    prompt,
+    keyword,
+    usedSourceIds,
+    fetch,
+    accessKey,
+  });
+  const key = unsplashAccessKey({ accessKey });
+  if (key && photo.downloadLocation) {
+    const fetchImpl = fetch || global.fetch;
+    await fetchImpl(photo.downloadLocation, { headers: unsplashHeaders(key) }).catch(() => {});
+  }
+  const uploaded = await uploadCloudinary(photo.url, `unsplash-${slug}`, {
+    fetch,
+    overwrite: true,
+  });
+  return {
+    ...uploaded,
+    alt: alt || photo.alt || `${title || "WorkSteady article"} featured image`,
+    provider: "unsplash+cloudinary",
+    sourceId: `${photo.id}:${uploaded.sourceId}`,
+    prompt: `unsplash:${photo.id}`,
+    promptFingerprint: promptFingerprint(`unsplash:${photo.id}`),
+  };
+}
+
 function escapeXml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -182,9 +459,11 @@ async function generateFeaturedImage({
   slug,
   title,
   category,
+  keyword,
   usedFingerprints = new Set(),
   usedSourceIds = new Set(),
   fetch,
+  accessKey,
 }) {
   const safeAlt = alt || `${title || slug} featured image`;
   let generationError;
@@ -214,6 +493,21 @@ async function generateFeaturedImage({
     }
   }
   try {
+    return await unsplashFeaturedImage({
+      alt: safeAlt,
+      slug,
+      title,
+      category,
+      prompt,
+      keyword,
+      usedSourceIds,
+      fetch,
+      accessKey,
+    });
+  } catch (error) {
+    generationError = generationError || error;
+  }
+  try {
     return await fallbackFeaturedImage({ alt: safeAlt, slug, title, category, fetch });
   } catch (fallbackError) {
     throw generationError || fallbackError;
@@ -222,12 +516,15 @@ async function generateFeaturedImage({
 
 module.exports = {
   buildFallbackSvg,
+  buildUnsplashQueries,
   cloudinarySignature,
   deriveVariants,
   fallbackFeaturedImage,
   generateFeaturedImage,
   parseCloudinaryUrl,
+  pickCuratedUnsplashPhoto,
   promptFingerprint,
   replicateFlux,
+  unsplashFeaturedImage,
   uploadCloudinary,
 };
