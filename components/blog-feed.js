@@ -63,7 +63,6 @@ export function BlogCard({ post }) {
         ) : (
           <span className={styles.imageFallback} aria-hidden="true">W</span>
         )}
-        {post.category && <span className={styles.imageBadge}>{post.category}</span>}
       </Link>
 
       <div className={styles.cardBody}>
