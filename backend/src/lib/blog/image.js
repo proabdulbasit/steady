@@ -177,7 +177,7 @@ const UNSPLASH_CATALOG = [
     id: "photo-1460925895917-afdab827c52f",
     url: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1600&h=900&q=80",
     alt: "Laptop showing charts and financial analytics",
-    tags: ["forecast", "analytics", "dashboard", "ai", "cash", "planning", "budget", "finance"],
+    tags: ["forecast", "analytics", "dashboard", "ai", "cash", "planning", "budget", "finance", "marketing", "roi", "campaign", "digital"],
   },
   {
     id: "photo-1553413077-190dd305871c",
@@ -251,6 +251,18 @@ const UNSPLASH_CATALOG = [
     alt: "Sunlit office with desks and plants",
     tags: ["office", "workplace", "operations", "space", "studio"],
   },
+  {
+    id: "photo-1558494949-ef010cbdcc31",
+    url: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "Server racks glowing in a data center",
+    tags: ["cloud", "server", "hosting", "infrastructure", "performance", "data", "costs", "optimize"],
+  },
+  {
+    id: "photo-1506784983877-45594efa4cbe",
+    url: "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=1600&h=900&q=80",
+    alt: "A calendar with scheduled dates marked",
+    tags: ["schedule", "scheduling", "calendar", "overtime", "staffing", "roster", "employee"],
+  },
 ];
 
 function collectTopicTerms({ title, category, prompt, keyword } = {}) {
@@ -284,8 +296,8 @@ function pickCuratedUnsplashPhoto({ title, category, prompt, keyword, usedSource
     .filter((photo) => !usedSourceIds.has(photo.id))
     .map((photo) => ({ photo, score: scorePhotoTags(photo.tags, terms) }))
     .sort((left, right) => right.score - left.score || left.photo.id.localeCompare(right.photo.id));
-  const best = ranked.find((entry) => entry.score > 0) || ranked[0];
-  if (!best) throw new Error("No unused Unsplash catalog photo remained.");
+  const best = ranked.find((entry) => entry.score > 0);
+  if (!best) throw new Error("No relevant Unsplash catalog photo matched the article topic.");
   return best.photo;
 }
 
@@ -338,7 +350,7 @@ async function searchUnsplashPhotos(query, { fetch, accessKey, usedSourceIds = n
   );
   endpoint.searchParams.set("query", query);
   endpoint.searchParams.set("orientation", "landscape");
-  endpoint.searchParams.set("per_page", "10");
+  endpoint.searchParams.set("per_page", "30");
   if (key) endpoint.searchParams.set("content_filter", "high");
   const response = await fetchImpl(endpoint, {
     headers: key
@@ -358,6 +370,10 @@ async function searchUnsplashPhotos(query, { fetch, accessKey, usedSourceIds = n
     .map(normalizeUnsplashPhoto)
     .filter(Boolean)
     .filter((photo) => !usedSourceIds.has(photo.id));
+  if (!photos.length) {
+    console.warn(`[blog-image] Unsplash returned no free photos for "${query}".`);
+    return null;
+  }
   photos.sort((left, right) => scorePhotoTags(right.tags, terms) - scorePhotoTags(left.tags, terms));
   return photos[0] || null;
 }

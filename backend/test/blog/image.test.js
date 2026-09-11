@@ -61,6 +61,12 @@ test("curated Unsplash photos match invoicing, inventory, and remote-team topics
     keyword: "remote team management",
   });
   assert.equal(remote.tags.some((tag) => /remote|team|meeting|management/.test(tag)), true);
+
+  const cloud = pickCuratedUnsplashPhoto({
+    title: "How to Optimize Cloud Costs",
+    keyword: "cloud costs",
+  });
+  assert.equal(cloud.tags.some((tag) => /cloud|server|hosting|infrastructure/.test(tag)), true);
   assert.notEqual(invoice.id, inventory.id);
 });
 
