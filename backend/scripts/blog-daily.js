@@ -29,7 +29,7 @@ const {
   markdownWordCount,
 } = require("../src/lib/blog/quality");
 const { buildBlogSchema } = require("../src/lib/blog/schema");
-const { generateFeaturedImage, promptFingerprint } = require("../src/lib/blog/image");
+const { generateFeaturedImage, promptFingerprint, unsplashFeaturedImage } = require("../src/lib/blog/image");
 const { getSiteBaseUrl } = require("../src/lib/blog/constants");
 
 function qualityThreshold() {
@@ -433,6 +433,49 @@ Return short notes plus the exact URLs.`
   };
 }
 
+async function refreshFallbackImages({
+  usedFingerprints,
+  usedSourceIds,
+  dryRun,
+  limit = 3,
+}) {
+  const posts = await BlogPost.find({
+    status: "published",
+    "featuredImage.provider": "cloudinary-fallback",
+  })
+    .select("title slug category primaryKeyword featuredImage")
+    .sort({ publishedAt: -1 })
+    .limit(limit)
+    .lean();
+  const refreshed = [];
+  for (const post of posts) {
+    if (dryRun) {
+      refreshed.push({ slug: post.slug, dryRun: true });
+      continue;
+    }
+    try {
+      const featuredImage = await unsplashFeaturedImage({
+        alt: post.featuredImage?.alt,
+        slug: post.slug,
+        title: post.title,
+        category: post.category,
+        keyword: post.primaryKeyword,
+        usedSourceIds,
+      });
+      usedFingerprints.add(featuredImage.promptFingerprint);
+      usedSourceIds.add(featuredImage.sourceId.split(":")[0]);
+      await BlogPost.updateOne(
+        { _id: post._id },
+        { $set: { featuredImage, updatedAt: new Date() } }
+      );
+      refreshed.push({ slug: post.slug, provider: featuredImage.provider });
+    } catch (error) {
+      refreshed.push({ slug: post.slug, error: error.message });
+    }
+  }
+  return refreshed;
+}
+
 async function runDaily(options = {}) {
   const dryRun = options.dryRun ?? isDryRun();
   const count =
@@ -476,6 +519,11 @@ async function runDaily(options = {}) {
         .map((post) => post.featuredImage?.sourceId?.split(":")[0])
         .filter(Boolean)
     );
+    const imageRefreshes = await refreshFallbackImages({
+      usedFingerprints,
+      usedSourceIds,
+      dryRun,
+    });
     const results = [];
     for (const opportunity of claimed) {
       try {
@@ -524,7 +572,7 @@ async function runDaily(options = {}) {
       run.completedAt = new Date();
       await run.save();
     }
-    return { dryRun, claimed: claimed.length, results };
+    return { dryRun, claimed: claimed.length, results, imageRefreshes };
   } catch (error) {
     if (!dryRun) {
       await KeywordOpportunity.updateMany(
@@ -560,7 +608,8 @@ if (require.main === module) {
     .then((result) => {
       console.log(JSON.stringify(result, null, 2));
       const published = (result.results || []).filter((item) => item.publish).length;
-      if (!result.dryRun && published === 0) {
+      const refreshed = (result.imageRefreshes || []).filter((item) => item.provider).length;
+      if (!result.dryRun && published === 0 && refreshed === 0) {
         console.error(
           "[blog-daily] No posts were published. The daily workflow must publish at least one article."
         );
