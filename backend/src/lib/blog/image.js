@@ -326,25 +326,40 @@ function normalizeUnsplashPhoto(photo) {
   };
 }
 
+function isPremiumUnsplashUrl(url) {
+  return /plus\.unsplash\.com|premium_photo/i.test(String(url || ""));
+}
+
 async function searchUnsplashPhotos(query, { fetch, accessKey, usedSourceIds = new Set() } = {}) {
   const key = unsplashAccessKey({ accessKey });
-  if (!key) throw new Error("Missing UNSPLASH_ACCESS_KEY.");
   const fetchImpl = fetch || global.fetch;
-  const endpoint = new URL("https://api.unsplash.com/search/photos");
+  const endpoint = new URL(
+    key ? "https://api.unsplash.com/search/photos" : "https://unsplash.com/napi/search/photos"
+  );
   endpoint.searchParams.set("query", query);
   endpoint.searchParams.set("orientation", "landscape");
-  endpoint.searchParams.set("content_filter", "high");
-  endpoint.searchParams.set("per_page", "8");
-  const response = await fetchImpl(endpoint, { headers: unsplashHeaders(key) });
+  endpoint.searchParams.set("per_page", "10");
+  if (key) endpoint.searchParams.set("content_filter", "high");
+  const response = await fetchImpl(endpoint, {
+    headers: key
+      ? unsplashHeaders(key)
+      : {
+          Accept: "application/json",
+          "User-Agent": "WorkSteadyBlog/1.0 (+https://worksteady.app)",
+        },
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(`Unsplash search failed (${response.status}): ${body.errors?.[0] || response.statusText}`);
   }
-  const photos = (body.results || []).map(normalizeUnsplashPhoto).filter(Boolean);
-  const unused = photos.filter((photo) => !usedSourceIds.has(photo.id));
   const terms = collectTopicTerms({ prompt: query });
-  unused.sort((left, right) => scorePhotoTags(right.tags, terms) - scorePhotoTags(left.tags, terms));
-  return unused[0] || null;
+  const photos = (body.results || [])
+    .filter((photo) => !isPremiumUnsplashUrl(photo?.urls?.raw || photo?.urls?.regular || ""))
+    .map(normalizeUnsplashPhoto)
+    .filter(Boolean)
+    .filter((photo) => !usedSourceIds.has(photo.id));
+  photos.sort((left, right) => scorePhotoTags(right.tags, terms) - scorePhotoTags(left.tags, terms));
+  return photos[0] || null;
 }
 
 async function selectUnsplashPhoto({
@@ -356,16 +371,13 @@ async function selectUnsplashPhoto({
   fetch,
   accessKey,
 } = {}) {
-  const key = unsplashAccessKey({ accessKey });
-  if (key) {
-    const queries = buildUnsplashQueries({ title, category, prompt, keyword });
-    for (const query of queries) {
-      try {
-        const photo = await searchUnsplashPhotos(query, { fetch, accessKey: key, usedSourceIds });
-        if (photo) return photo;
-      } catch {
-        // Try the next, more general query before using the curated catalog.
-      }
+  const queries = buildUnsplashQueries({ title, category, prompt, keyword });
+  for (const query of queries) {
+    try {
+      const photo = await searchUnsplashPhotos(query, { fetch, accessKey, usedSourceIds });
+      if (photo) return photo;
+    } catch {
+      // Try the next, more general query before using the curated catalog.
     }
   }
   return pickCuratedUnsplashPhoto({ title, category, prompt, keyword, usedSourceIds });

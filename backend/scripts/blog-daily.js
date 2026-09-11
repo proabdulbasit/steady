@@ -437,11 +437,17 @@ async function refreshFallbackImages({
   usedFingerprints,
   usedSourceIds,
   dryRun,
-  limit = 3,
+  limit = 6,
 }) {
   const posts = await BlogPost.find({
     status: "published",
-    "featuredImage.provider": "cloudinary-fallback",
+    $or: [
+      { "featuredImage.provider": "cloudinary-fallback" },
+      {
+        "featuredImage.provider": "unsplash+cloudinary",
+        "featuredImage.sourceId": { $regex: "^photo-" },
+      },
+    ],
   })
     .select("title slug category primaryKeyword featuredImage")
     .sort({ publishedAt: -1 })

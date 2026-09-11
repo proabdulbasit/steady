@@ -122,6 +122,54 @@ test("Replicate credit failures fall back to a relevant Unsplash photo", async (
   assert.match(String(uploads[0]), /images\.unsplash\.com/);
 });
 
+test("topic search without an API key still picks a relevant free Unsplash photo", async () => {
+  const image = await generateFeaturedImage({
+    prompt: "Photorealistic no text no logos",
+    alt: "Retail inventory shelves",
+    slug: "jit-inventory",
+    title: "Just-in-Time Inventory for Small Retailers",
+    category: "Operations",
+    keyword: "just-in-time inventory",
+    accessKey: "",
+    fetch: async (url, options) => {
+      const target = String(url);
+      if (target.includes("replicate.com")) {
+        return new Response("{}", { status: 402, headers: { "content-type": "application/json" } });
+      }
+      if (target.includes("unsplash.com/napi/search/photos")) {
+        assert.match(target, /inventory|retail|warehouse/i);
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "premium-skip",
+                alt_description: "Premium warehouse",
+                urls: { raw: "https://plus.unsplash.com/premium_photo-warehouse" },
+              },
+              {
+                id: "warehouse-free-1",
+                alt_description: "Cardboard boxes stacked in a retail warehouse",
+                description: "Inventory storage for a small retailer",
+                tags: [{ title: "warehouse" }, { title: "inventory" }],
+                urls: { raw: "https://images.unsplash.com/photo-warehouse-free" },
+              },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      if (target.includes("cloudinary.com")) {
+        assert.match(String(options.body.get("file") || ""), /photo-warehouse-free/);
+        return cloudinarySuccess("worksteady/blog/unsplash-jit-inventory");
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    },
+  });
+
+  assert.equal(image.provider, "unsplash+cloudinary");
+  assert.match(image.sourceId, /warehouse-free-1/);
+});
+
 test("branded artwork is used only after Unsplash is unavailable", async () => {
   const image = await generateFeaturedImage({
     prompt: "A photorealistic workshop desk",
@@ -137,6 +185,12 @@ test("branded artwork is used only after Unsplash is unavailable", async () => {
           JSON.stringify({ detail: "You have insufficient credit to run this model." }),
           { status: 402, headers: { "content-type": "application/json" } }
         );
+      }
+      if (target.includes("unsplash.com/napi/search/photos")) {
+        return new Response(JSON.stringify({ results: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
       }
       if (target.includes("cloudinary.com")) {
         const file = String(options.body.get("file") || "");
