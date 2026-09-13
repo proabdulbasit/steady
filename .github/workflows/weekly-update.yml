@@ -2,7 +2,10 @@ name: Research WorkSteady blog opportunities
 
 on:
   schedule:
-    - cron: "0 9 * * 1"
+    # Refill the topic queue before each publish window (UTC).
+    - cron: "0 3 * * *"
+    - cron: "0 8 * * *"
+    - cron: "0 13 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
