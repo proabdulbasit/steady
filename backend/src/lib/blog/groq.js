@@ -28,27 +28,121 @@ function retryAfterMs(response, message = "") {
   );
 }
 
-function parseJsonResponse(value) {
-  if (value && typeof value === "object") return value;
-  const text = String(value || "").trim();
-  const unfenced = text
+function stripJsonFence(value) {
+  return String(value || "")
+    .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "")
     .trim();
+}
+
+function extractJsonCandidate(text) {
+  const firstObject = text.indexOf("{");
+  const firstArray = text.indexOf("[");
+  const starts = [firstObject, firstArray].filter((index) => index >= 0);
+  if (!starts.length) return "";
+  return text.slice(Math.min(...starts));
+}
+
+function closeOpenJson(text) {
+  let inString = false;
+  let escape = false;
+  const stack = [];
+  for (const char of text) {
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (char === "\\") {
+        escape = true;
+        continue;
+      }
+      if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === "{") stack.push("}");
+    else if (char === "[") stack.push("]");
+    else if (char === "}" || char === "]") stack.pop();
+  }
+  let repaired = text.replace(/,\s*$/, "");
+  if (inString) repaired += '"';
+  repaired = repaired.replace(/,\s*$/, "");
+  while (stack.length) repaired += stack.pop();
+  return repaired;
+}
+
+function extractCompleteOpportunityObjects(text) {
+  const marker = text.match(/"opportunities"\s*:\s*\[/);
+  if (!marker) return null;
+  const objects = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escape = false;
+  for (let index = marker.index + marker[0].length; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (char === "\\") {
+        escape = true;
+        continue;
+      }
+      if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === "{") {
+      if (depth === 0) start = index;
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        try {
+          objects.push(JSON.parse(text.slice(start, index + 1)));
+        } catch {
+          // Skip a malformed object and keep any complete neighbors.
+        }
+        start = -1;
+      } else if (depth < 0) {
+        break;
+      }
+    }
+  }
+  return objects.length ? { opportunities: objects } : null;
+}
+
+function parseJsonResponse(value) {
+  if (value && typeof value === "object") return value;
+  const unfenced = stripJsonFence(value);
+  const candidate = extractJsonCandidate(unfenced) || unfenced;
+  if (!candidate) throw new Error("Groq response did not contain JSON.");
+
+  for (const attempt of [unfenced, candidate]) {
+    try {
+      return JSON.parse(attempt);
+    } catch {
+      // Try the next salvage strategy.
+    }
+  }
+
+  const salvaged = extractCompleteOpportunityObjects(candidate);
+  if (salvaged) return salvaged;
+
   try {
-    return JSON.parse(unfenced);
+    return JSON.parse(closeOpenJson(candidate));
   } catch {
-    const firstObject = unfenced.indexOf("{");
-    const firstArray = unfenced.indexOf("[");
-    const starts = [firstObject, firstArray].filter((index) => index >= 0);
-    if (!starts.length) throw new Error("Groq response did not contain JSON.");
-    const start = Math.min(...starts);
-    const end =
-      unfenced[start] === "{"
-        ? unfenced.lastIndexOf("}")
-        : unfenced.lastIndexOf("]");
-    if (end <= start) throw new Error("Groq response contained incomplete JSON.");
-    return JSON.parse(unfenced.slice(start, end + 1));
+    throw new Error("Groq response contained incomplete JSON.");
   }
 }
 
@@ -192,6 +286,19 @@ class GroqClient {
         }
         const message = body.choices?.[0]?.message || {};
         const content = message.content;
+        const finishReason = body.choices?.[0]?.finish_reason || "unknown";
+        if (finishReason === "length" && content && !options.lengthRetry) {
+          try {
+            JSON.parse(stripJsonFence(content));
+          } catch {
+            return this.chat(messages, {
+              ...options,
+              model,
+              maxTokens: Math.max(options.maxTokens ?? 0, 6000),
+              lengthRetry: true,
+            });
+          }
+        }
         if (!content) {
           if (options.webSearch && !options.emptyCompletionRetry) {
             return this.chat(messages, {
@@ -202,7 +309,6 @@ class GroqClient {
               emptyCompletionRetry: true,
             });
           }
-          const finishReason = body.choices?.[0]?.finish_reason || "unknown";
           const completionTokens = body.usage?.completion_tokens ?? "unknown";
           throw new Error(
             `Groq returned an empty completion (finish_reason=${finishReason}, completion_tokens=${completionTokens}).`
@@ -222,10 +328,7 @@ class GroqClient {
             ...options,
             model: options.research ? this.researchModel : model,
             webSearch: options.research ? true : options.webSearch,
-            maxTokens: Math.min(
-              options.maxTokens ?? 8000,
-              options.research ? 1800 : 2600
-            ),
+            maxTokens: Math.max(options.maxTokens ?? 8000, options.research ? 4096 : 2600),
             compactAttempt: true,
           });
         }
@@ -267,7 +370,18 @@ class GroqClient {
       // The prompt still requires JSON and parseJsonResponse validates the result.
       json: !options.webSearch,
     });
-    return { ...result, data: parseJsonResponse(result.content) };
+    try {
+      return { ...result, data: parseJsonResponse(result.content) };
+    } catch (error) {
+      if (options.jsonParseRetry || !/incomplete JSON|JSON/i.test(error.message || "")) {
+        throw error;
+      }
+      return this.json(messages, {
+        ...options,
+        maxTokens: Math.max(options.maxTokens ?? 0, 6000),
+        jsonParseRetry: true,
+      });
+    }
   }
 
   async research(prompt) {

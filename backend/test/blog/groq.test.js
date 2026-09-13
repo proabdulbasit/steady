@@ -5,6 +5,7 @@ const {
   compactMessages,
   durationToMs,
   extractSearchSources,
+  parseJsonResponse,
   retryAfterMs,
 } = require("../../src/lib/blog/groq");
 
@@ -157,6 +158,62 @@ test("research falls back to GPT-OSS browser search after a 413", async () => {
   const result = await client.research("Find official tax guidance.");
   assert.deepEqual(models, ["groq/compound-mini", "openai/gpt-oss-20b"]);
   assert.match(result.content, /irs\.gov/);
+});
+
+test("parseJsonResponse salvages truncated opportunity arrays", () => {
+  const truncated = `{
+    "opportunities": [
+      {
+        "keyword": "cash flow forecasting",
+        "titleSuggestion": "How small businesses can forecast cash flow",
+        "type": "new",
+        "searchIntent": "informational",
+        "cluster": "Finance",
+        "rationale": "Owners need a weekly cash view.",
+        "businessRelevance": 88,
+        "evidence": [{"title": "SBA", "url": "https://www.sba.gov/", "publisher": "SBA"}]
+      },
+      {
+        "keyword": "payroll overtime
+`;
+
+  const parsed = parseJsonResponse(truncated);
+  assert.equal(parsed.opportunities.length, 1);
+  assert.equal(parsed.opportunities[0].keyword, "cash flow forecasting");
+});
+
+test("truncated JSON completions retry with a larger output budget", async () => {
+  const requestBodies = [];
+  const client = new GroqClient({
+    apiKey: "test-key",
+    researchModel: "openai/gpt-oss-20b",
+    maxRetries: 0,
+    fetch: async (_url, options) => {
+      requestBodies.push(JSON.parse(options.body));
+      const content =
+        requestBodies.length === 1
+          ? '{"opportunities":[{"keyword":"payroll'
+          : '{"opportunities":[]}';
+      return new Response(
+        JSON.stringify({
+          model: "openai/gpt-oss-20b",
+          choices: [{ finish_reason: "length", message: { content } }],
+          usage: { completion_tokens: 2500 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    },
+  });
+
+  const result = await client.json(
+    [{ role: "user", content: "Research and return JSON." }],
+    { research: true, webSearch: true, maxTokens: 2500 }
+  );
+
+  assert.equal(requestBodies.length, 2);
+  assert.equal(requestBodies[0].max_completion_tokens, 2500);
+  assert.equal(requestBodies[1].max_completion_tokens, 6000);
+  assert.deepEqual(result.data, { opportunities: [] });
 });
 
 test("empty browser-search completions retry with a larger output budget", async () => {

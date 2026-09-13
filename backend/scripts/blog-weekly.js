@@ -15,8 +15,24 @@ const { GroqClient } = require("../src/lib/blog/groq");
 const { duplicateScore, normalizeText } = require("../src/lib/blog/duplicate");
 
 function maxOpportunities() {
-  const parsed = Number.parseInt(process.env.MAX_KEYWORD_OPPORTUNITIES || "8", 10);
-  return Math.min(8, Math.max(1, Number.isFinite(parsed) ? parsed : 8));
+  const parsed = Number.parseInt(process.env.MAX_KEYWORD_OPPORTUNITIES || "4", 10);
+  return Math.min(4, Math.max(1, Number.isFinite(parsed) ? parsed : 4));
+}
+
+function summarizePosts(posts) {
+  return (Array.isArray(posts) ? posts : []).slice(0, 24).map((post) => ({
+    slug: post.slug,
+    title: post.title,
+    keyword: post.primaryKeyword || "",
+  }));
+}
+
+function summarizeOpportunities(items) {
+  return (Array.isArray(items) ? items : []).slice(0, 40).map((item) => ({
+    keyword: item.keyword,
+    type: item.type,
+    status: item.status,
+  }));
 }
 
 function normalizeOpportunity(item, postsBySlug) {
@@ -90,16 +106,16 @@ async function runWeekly(options = {}) {
   try {
     const [posts, opportunities] = await Promise.all([
       BlogPost.find({ status: { $in: ["published", "needs_review", "draft"] } })
-        .select("_id title slug excerpt primaryKeyword category updatedAt")
+        .select("title slug primaryKeyword")
         .sort({ updatedAt: -1 })
-        .limit(80)
+        .limit(24)
         .lean(),
       KeywordOpportunity.find({
         status: { $in: ["approved", "processing", "needs_review", "published"] },
       })
-        .select("keyword normalizedKeyword type status existingPostId mergePostIds")
+        .select("keyword normalizedKeyword type status")
         .sort({ updatedAt: -1 })
-        .limit(120)
+        .limit(40)
         .lean(),
     ]);
     const structured = await groq.json(
@@ -107,33 +123,32 @@ async function runWeekly(options = {}) {
         {
           role: "system",
           content:
-            "Use web search to research current, evidence-backed content opportunities for WorkSteady, then return strict JSON. Cite reliable primary HTTPS sources. Never invent search-volume, traffic, ranking, customer, or product data.",
+            "Use web search to research current, evidence-backed content opportunities for WorkSteady, then return minified JSON only. Cite reliable primary HTTPS sources. Never invent search-volume, traffic, ranking, customer, or product data.",
         },
         {
           role: "user",
-          content: `Return {"opportunities": [...]} with at most ${maxOpportunities()} entries.
+          content: `Return {"opportunities":[...]} with at most ${maxOpportunities()} compact entries.
 Each entry needs keyword, titleSuggestion, type (new/update/consolidate),
 existingPostSlug (required for update/consolidate), consolidatePostSlugs
-(required for consolidate and containing the competing posts to merge), searchIntent, cluster,
-secondaryKeywords, questions, rationale, businessRelevance (0-100 based only
-on fit with small-business operations), and evidence [{title,url,publisher}].
-Focus on practical revenue, cost, staffing, workflow, and daily decision-making
-problems for small-business operators. Identify new topics and posts that need
-updating or consolidating. Avoid duplicates of the supplied posts and
-opportunities.
+(required for consolidate), searchIntent, cluster, secondaryKeywords,
+questions, rationale (under 40 words), businessRelevance (60-100), and
+evidence [{title,url,publisher}] with at most 2 HTTPS sources.
+Focus on practical revenue, cost, staffing, workflow, and daily decisions
+for small-business operators. Avoid duplicates of the supplied posts and
+opportunities. Do not wrap the JSON in Markdown.
 
 Existing posts:
-${JSON.stringify(posts)}
+${JSON.stringify(summarizePosts(posts))}
 
 Existing opportunities:
-${JSON.stringify(opportunities)}`,
+${JSON.stringify(summarizeOpportunities(opportunities))}`,
         },
       ],
       {
         research: true,
         webSearch: true,
         temperature: 0.1,
-        maxTokens: 2500,
+        maxTokens: 4096,
       }
     );
     const postsBySlug = new Map(posts.map((post) => [post.slug, post]));
@@ -228,4 +243,6 @@ module.exports = {
   maxOpportunities,
   normalizeOpportunity,
   runWeekly,
+  summarizeOpportunities,
+  summarizePosts,
 };
