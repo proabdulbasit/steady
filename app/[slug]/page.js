@@ -6,10 +6,10 @@ import remarkGfm from "remark-gfm";
 import { TrendingPost } from "../../components/blog-feed";
 import {
   BlogNotFoundError,
-  BlogBackendError,
   canonicalPostUrl,
   getBlogPost,
   getBlogPosts,
+  isValidBlogSlug,
   normalizeSlug,
 } from "../../lib/blog-server";
 import { hreflangAlternates } from "../../lib/seo";
@@ -180,7 +180,7 @@ export async function generateMetadata({ params, searchParams }) {
   return {
     title: post.metaTitle || post.title,
     description,
-    alternates: { canonical },
+    alternates: hreflangAlternates(canonical),
     authors: [{ name: author.name, ...(author.url ? { url: author.url } : {}) }],
     robots: {
       index: !noindex,
