@@ -182,7 +182,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Confirm modal — preserved logic */}
+      {/* Confirm modal — preserved logic. */}
       {showConfirm && (
         <div
           role="dialog"
