@@ -28,121 +28,110 @@ function retryAfterMs(response, message = "") {
   );
 }
 
-function stripJsonFence(value) {
-  return String(value || "")
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/, "")
-    .trim();
-}
-
-function extractJsonCandidate(text) {
-  const firstObject = text.indexOf("{");
-  const firstArray = text.indexOf("[");
-  const starts = [firstObject, firstArray].filter((index) => index >= 0);
-  if (!starts.length) return "";
-  return text.slice(Math.min(...starts));
-}
-
-function closeOpenJson(text) {
-  let inString = false;
-  let escape = false;
-  const stack = [];
-  for (const char of text) {
-    if (inString) {
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (char === "\\") {
-        escape = true;
-        continue;
-      }
-      if (char === '"') inString = false;
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-    if (char === "{") stack.push("}");
-    else if (char === "[") stack.push("]");
-    else if (char === "}" || char === "]") stack.pop();
-  }
-  let repaired = text.replace(/,\s*$/, "");
-  if (inString) repaired += '"';
-  repaired = repaired.replace(/,\s*$/, "");
-  while (stack.length) repaired += stack.pop();
-  return repaired;
-}
-
-function extractCompleteOpportunityObjects(text) {
-  const marker = text.match(/"opportunities"\s*:\s*\[/);
-  if (!marker) return null;
-  const objects = [];
+function extractCompleteJsonValues(text) {
+  const values = [];
   let depth = 0;
-  let start = -1;
   let inString = false;
   let escape = false;
-  for (let index = marker.index + marker[0].length; index < text.length; index += 1) {
+  let start = -1;
+  for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
     if (inString) {
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (char === "\\") {
-        escape = true;
-        continue;
-      }
-      if (char === '"') inString = false;
+      if (escape) escape = false;
+      else if (char === "\\") escape = true;
+      else if (char === '"') inString = false;
       continue;
     }
     if (char === '"') {
       inString = true;
       continue;
     }
-    if (char === "{") {
+    if (char === "{" || char === "[") {
       if (depth === 0) start = index;
       depth += 1;
-    } else if (char === "}") {
+      continue;
+    }
+    if (char === "}" || char === "]") {
+      if (depth === 0) continue;
       depth -= 1;
       if (depth === 0 && start >= 0) {
         try {
-          objects.push(JSON.parse(text.slice(start, index + 1)));
+          values.push(JSON.parse(text.slice(start, index + 1)));
         } catch {
-          // Skip a malformed object and keep any complete neighbors.
+          // Skip values that look complete but still fail to parse.
         }
         start = -1;
-      } else if (depth < 0) {
-        break;
       }
     }
   }
-  return objects.length ? { opportunities: objects } : null;
+  return values;
+}
+
+function isOpportunityShape(value) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      (value.keyword || value.titleSuggestion)
+  );
+}
+
+function salvageTruncatedJson(text) {
+  const values = extractCompleteJsonValues(text);
+  const wrapper = values.find(
+    (value) =>
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Array.isArray(value.opportunities)
+  );
+  if (wrapper) return wrapper;
+
+  const array = values.find((value) => Array.isArray(value));
+  if (array) {
+    const opportunities = array.filter(isOpportunityShape);
+    if (opportunities.length) return { opportunities };
+  }
+
+  const marker = text.indexOf('"opportunities"');
+  if (marker >= 0) {
+    const bracket = text.indexOf("[", marker);
+    if (bracket >= 0) {
+      const inner = extractCompleteJsonValues(text.slice(bracket + 1)).filter(isOpportunityShape);
+      if (inner.length) return { opportunities: inner };
+    }
+  }
+
+  throw new Error("Groq response contained incomplete JSON.");
 }
 
 function parseJsonResponse(value) {
   if (value && typeof value === "object") return value;
-  const unfenced = stripJsonFence(value);
-  const candidate = extractJsonCandidate(unfenced) || unfenced;
-  if (!candidate) throw new Error("Groq response did not contain JSON.");
-
-  for (const attempt of [unfenced, candidate]) {
-    try {
-      return JSON.parse(attempt);
-    } catch {
-      // Try the next salvage strategy.
-    }
-  }
-
-  const salvaged = extractCompleteOpportunityObjects(candidate);
-  if (salvaged) return salvaged;
-
+  const text = String(value || "").trim();
+  const unfenced = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
   try {
-    return JSON.parse(closeOpenJson(candidate));
+    return JSON.parse(unfenced);
   } catch {
-    throw new Error("Groq response contained incomplete JSON.");
+    const firstObject = unfenced.indexOf("{");
+    const firstArray = unfenced.indexOf("[");
+    const starts = [firstObject, firstArray].filter((index) => index >= 0);
+    if (!starts.length) throw new Error("Groq response did not contain JSON.");
+    const start = Math.min(...starts);
+    const end =
+      unfenced[start] === "{"
+        ? unfenced.lastIndexOf("}")
+        : unfenced.lastIndexOf("]");
+    if (end > start) {
+      try {
+        return JSON.parse(unfenced.slice(start, end + 1));
+      } catch {
+        return salvageTruncatedJson(unfenced);
+      }
+    }
+    return salvageTruncatedJson(unfenced);
   }
 }
 
@@ -286,19 +275,6 @@ class GroqClient {
         }
         const message = body.choices?.[0]?.message || {};
         const content = message.content;
-        const finishReason = body.choices?.[0]?.finish_reason || "unknown";
-        if (finishReason === "length" && content && !options.lengthRetry) {
-          try {
-            JSON.parse(stripJsonFence(content));
-          } catch {
-            return this.chat(messages, {
-              ...options,
-              model,
-              maxTokens: Math.max(options.maxTokens ?? 0, 6000),
-              lengthRetry: true,
-            });
-          }
-        }
         if (!content) {
           if (options.webSearch && !options.emptyCompletionRetry) {
             return this.chat(messages, {
@@ -309,6 +285,7 @@ class GroqClient {
               emptyCompletionRetry: true,
             });
           }
+          const finishReason = body.choices?.[0]?.finish_reason || "unknown";
           const completionTokens = body.usage?.completion_tokens ?? "unknown";
           throw new Error(
             `Groq returned an empty completion (finish_reason=${finishReason}, completion_tokens=${completionTokens}).`
@@ -373,14 +350,23 @@ class GroqClient {
     try {
       return { ...result, data: parseJsonResponse(result.content) };
     } catch (error) {
-      if (options.jsonParseRetry || !/incomplete JSON|JSON/i.test(error.message || "")) {
-        throw error;
+      if (!options.parseRetry) {
+        return this.json(messages, {
+          ...options,
+          maxTokens: Math.max(options.maxTokens ?? 8000, 8000),
+          parseRetry: true,
+        });
       }
-      return this.json(messages, {
-        ...options,
-        maxTokens: Math.max(options.maxTokens ?? 0, 6000),
-        jsonParseRetry: true,
-      });
+      if (options.webSearch && !options.parseRetryNoSearch) {
+        return this.json(messages, {
+          ...options,
+          webSearch: false,
+          maxTokens: Math.max(options.maxTokens ?? 8000, 8000),
+          parseRetry: true,
+          parseRetryNoSearch: true,
+        });
+      }
+      throw error;
     }
   }
 
@@ -412,7 +398,7 @@ class GroqClient {
         research: true,
         webSearch: true,
         temperature: 0.1,
-        maxTokens: 2500,
+        maxTokens: 8000,
       });
     }
   }
@@ -427,4 +413,5 @@ module.exports = {
   extractSearchSources,
   parseJsonResponse,
   retryAfterMs,
+  salvageTruncatedJson,
 };

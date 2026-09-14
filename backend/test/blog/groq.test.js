@@ -160,62 +160,6 @@ test("research falls back to GPT-OSS browser search after a 413", async () => {
   assert.match(result.content, /irs\.gov/);
 });
 
-test("parseJsonResponse salvages truncated opportunity arrays", () => {
-  const truncated = `{
-    "opportunities": [
-      {
-        "keyword": "cash flow forecasting",
-        "titleSuggestion": "How small businesses can forecast cash flow",
-        "type": "new",
-        "searchIntent": "informational",
-        "cluster": "Finance",
-        "rationale": "Owners need a weekly cash view.",
-        "businessRelevance": 88,
-        "evidence": [{"title": "SBA", "url": "https://www.sba.gov/", "publisher": "SBA"}]
-      },
-      {
-        "keyword": "payroll overtime
-`;
-
-  const parsed = parseJsonResponse(truncated);
-  assert.equal(parsed.opportunities.length, 1);
-  assert.equal(parsed.opportunities[0].keyword, "cash flow forecasting");
-});
-
-test("truncated JSON completions retry with a larger output budget", async () => {
-  const requestBodies = [];
-  const client = new GroqClient({
-    apiKey: "test-key",
-    researchModel: "openai/gpt-oss-20b",
-    maxRetries: 0,
-    fetch: async (_url, options) => {
-      requestBodies.push(JSON.parse(options.body));
-      const content =
-        requestBodies.length === 1
-          ? '{"opportunities":[{"keyword":"payroll'
-          : '{"opportunities":[]}';
-      return new Response(
-        JSON.stringify({
-          model: "openai/gpt-oss-20b",
-          choices: [{ finish_reason: "length", message: { content } }],
-          usage: { completion_tokens: 2500 },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } }
-      );
-    },
-  });
-
-  const result = await client.json(
-    [{ role: "user", content: "Research and return JSON." }],
-    { research: true, webSearch: true, maxTokens: 2500 }
-  );
-
-  assert.equal(requestBodies.length, 2);
-  assert.equal(requestBodies[0].max_completion_tokens, 2500);
-  assert.equal(requestBodies[1].max_completion_tokens, 6000);
-  assert.deepEqual(result.data, { opportunities: [] });
-});
-
 test("empty browser-search completions retry with a larger output budget", async () => {
   const requestBodies = [];
   const client = new GroqClient({
@@ -247,3 +191,45 @@ test("empty browser-search completions retry with a larger output budget", async
   assert.equal(requestBodies[1].max_completion_tokens, 4096);
   assert.deepEqual(result.data, { opportunities: [] });
 });
+
+test("truncated opportunity JSON keeps finished entries", () => {
+  const parsed = parseJsonResponse(`{"opportunities":[
+    {"keyword":"overtime scheduling","titleSuggestion":"Cut overtime with simpler scheduling","type":"new","searchIntent":"informational","cluster":"Staffing","rationale":"Owners need a practical overtime plan.","businessRelevance":88,"evidence":[{"title":"SBA","url":"https://www.sba.gov/","publisher":"SBA"}]},
+    {"keyword":"cash flow dashboard","titleSuggestion":"Build a weekly cash dashboard","type":"new","searchIntent":"informational","cluster":"Finance","rationale":"Owners need a`);
+
+  assert.equal(parsed.opportunities.length, 1);
+  assert.equal(parsed.opportunities[0].keyword, "overtime scheduling");
+});
+
+test("incomplete JSON retries with a larger completion budget", async () => {
+  const requestBodies = [];
+  const client = new GroqClient({
+    apiKey: "test-key",
+    researchModel: "openai/gpt-oss-20b",
+    maxRetries: 0,
+    fetch: async (_url, options) => {
+      requestBodies.push(JSON.parse(options.body));
+      const content =
+        requestBodies.length === 1
+          ? '{"opportunities":[{"keyword":"partial"'
+          : '{"opportunities":[{"keyword":"overtime scheduling","titleSuggestion":"Cut overtime","type":"new","cluster":"Staffing","rationale":"Keep schedules simple.","businessRelevance":90,"evidence":[{"title":"SBA","url":"https://www.sba.gov/","publisher":"SBA"}]}]}';
+      return new Response(
+        JSON.stringify({
+          model: "openai/gpt-oss-20b",
+          choices: [{ finish_reason: "length", message: { content } }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    },
+  });
+
+  const result = await client.json(
+    [{ role: "user", content: "Research and return JSON." }],
+    { research: true, webSearch: true, maxTokens: 2500 }
+  );
+
+  assert.equal(requestBodies.length, 2);
+  assert.equal(requestBodies[1].max_completion_tokens, 8000);
+  assert.equal(result.data.opportunities[0].keyword, "overtime scheduling");
+});
+

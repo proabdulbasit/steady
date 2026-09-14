@@ -15,24 +15,25 @@ const { GroqClient } = require("../src/lib/blog/groq");
 const { duplicateScore, normalizeText } = require("../src/lib/blog/duplicate");
 
 function maxOpportunities() {
-  const parsed = Number.parseInt(process.env.MAX_KEYWORD_OPPORTUNITIES || "4", 10);
-  return Math.min(4, Math.max(1, Number.isFinite(parsed) ? parsed : 4));
+  const parsed = Number.parseInt(process.env.MAX_KEYWORD_OPPORTUNITIES || "5", 10);
+  return Math.min(5, Math.max(1, Number.isFinite(parsed) ? parsed : 5));
 }
 
-function summarizePosts(posts) {
-  return (Array.isArray(posts) ? posts : []).slice(0, 24).map((post) => ({
-    slug: post.slug,
-    title: post.title,
-    keyword: post.primaryKeyword || "",
-  }));
-}
-
-function summarizeOpportunities(items) {
-  return (Array.isArray(items) ? items : []).slice(0, 40).map((item) => ({
-    keyword: item.keyword,
-    type: item.type,
-    status: item.status,
-  }));
+function compactResearchContext(posts = [], opportunities = []) {
+  return {
+    posts: (Array.isArray(posts) ? posts : []).slice(0, 24).map((post) => ({
+      slug: post.slug,
+      title: post.title,
+      keyword: post.primaryKeyword,
+    })),
+    opportunities: (Array.isArray(opportunities) ? opportunities : [])
+      .slice(0, 40)
+      .map((item) => ({
+        keyword: item.keyword,
+        type: item.type,
+        status: item.status,
+      })),
+  };
 }
 
 function normalizeOpportunity(item, postsBySlug) {
@@ -67,7 +68,7 @@ function normalizeOpportunity(item, postsBySlug) {
       url: String(source.url),
       publisher: String(source.publisher || ""),
     }))
-    .slice(0, 10);
+    .slice(0, 2);
   if (!evidence.length) return null;
   return {
     keyword,
@@ -106,49 +107,52 @@ async function runWeekly(options = {}) {
   try {
     const [posts, opportunities] = await Promise.all([
       BlogPost.find({ status: { $in: ["published", "needs_review", "draft"] } })
-        .select("title slug primaryKeyword")
+        .select("_id title slug excerpt primaryKeyword category updatedAt")
         .sort({ updatedAt: -1 })
-        .limit(24)
+        .limit(80)
         .lean(),
       KeywordOpportunity.find({
         status: { $in: ["approved", "processing", "needs_review", "published"] },
       })
-        .select("keyword normalizedKeyword type status")
+        .select("keyword normalizedKeyword type status existingPostId mergePostIds")
         .sort({ updatedAt: -1 })
-        .limit(40)
+        .limit(120)
         .lean(),
     ]);
+    const context = compactResearchContext(posts, opportunities);
     const structured = await groq.json(
       [
         {
           role: "system",
           content:
-            "Use web search to research current, evidence-backed content opportunities for WorkSteady, then return minified JSON only. Cite reliable primary HTTPS sources. Never invent search-volume, traffic, ranking, customer, or product data.",
+            "Use web search to research current, evidence-backed content opportunities for WorkSteady, then return strict JSON. Cite reliable primary HTTPS sources. Never invent search-volume, traffic, ranking, customer, or product data.",
         },
         {
           role: "user",
-          content: `Return {"opportunities":[...]} with at most ${maxOpportunities()} compact entries.
+          content: `Return compact JSON: {"opportunities":[...]} with at most ${maxOpportunities()} entries.
 Each entry needs keyword, titleSuggestion, type (new/update/consolidate),
 existingPostSlug (required for update/consolidate), consolidatePostSlugs
-(required for consolidate), searchIntent, cluster, secondaryKeywords,
-questions, rationale (under 40 words), businessRelevance (60-100), and
-evidence [{title,url,publisher}] with at most 2 HTTPS sources.
-Focus on practical revenue, cost, staffing, workflow, and daily decisions
-for small-business operators. Avoid duplicates of the supplied posts and
-opportunities. Do not wrap the JSON in Markdown.
+(required for consolidate and containing the competing posts to merge), searchIntent, cluster,
+secondaryKeywords (max 3), questions (max 2), rationale (max 40 words), businessRelevance (60-100 based only
+on fit with small-business operations), and evidence (max 2 items as [{title,url,publisher}]).
+Keep every string short. Do not include extra keys or unfinished objects.
+Focus on practical revenue, cost, staffing, workflow, and daily decision-making
+problems for small-business operators. Identify new topics and posts that need
+updating or consolidating. Avoid duplicates of the supplied posts and
+opportunities.
 
 Existing posts:
-${JSON.stringify(summarizePosts(posts))}
+${JSON.stringify(context.posts)}
 
 Existing opportunities:
-${JSON.stringify(summarizeOpportunities(opportunities))}`,
+${JSON.stringify(context.opportunities)}`,
         },
       ],
       {
         research: true,
         webSearch: true,
         temperature: 0.1,
-        maxTokens: 4096,
+        maxTokens: 8000,
       }
     );
     const postsBySlug = new Map(posts.map((post) => [post.slug, post]));
@@ -240,9 +244,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  compactResearchContext,
   maxOpportunities,
   normalizeOpportunity,
   runWeekly,
-  summarizeOpportunities,
-  summarizePosts,
 };
