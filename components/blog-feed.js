@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { blogPageHref, visiblePageItems } from "../lib/blog-pagination";
 import styles from "./blog-feed.module.css";
 
 export function formatPostDate(value) {
@@ -131,61 +132,98 @@ export function TrendingPost({ post }) {
   );
 }
 
-export default function BlogFeed({ initialPosts, initialCursor }) {
-  const [posts, setPosts] = useState(initialPosts);
-  const [cursor, setCursor] = useState(initialCursor);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+function BlogPagination({ page, totalPages }) {
+  const router = useRouter();
+  const items = visiblePageItems(page, totalPages);
+  const previousHref = blogPageHref(page - 1);
+  const nextHref = blogPageHref(page + 1);
 
-  async function loadMore() {
-    if (!cursor || loading) return;
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(
-        `/api/blog/posts?limit=9&cursor=${encodeURIComponent(cursor)}`,
-        { headers: { Accept: "application/json" } },
-      );
-      if (!response.ok) throw new Error("Unable to load more articles");
-      const data = await response.json();
-      const seen = new Set(posts.map((post) => post.slug));
-      const additions = Array.isArray(data.posts)
-        ? data.posts.filter((post) => post?.slug && !seen.has(post.slug))
-        : [];
-      setPosts((current) => [...current, ...additions]);
-      setCursor(typeof data.nextCursor === "string" ? data.nextCursor : data.pageInfo?.nextCursor || null);
-    } catch {
-      setError("More articles could not be loaded. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  function jumpToPage(event) {
+    const nextPage = Number.parseInt(event.target.value, 10);
+    if (!Number.isFinite(nextPage)) return;
+    router.push(blogPageHref(nextPage));
   }
 
   return (
+    <nav className={styles.pager} aria-label="Blog pages">
+      <div className={styles.pagerRow}>
+        {page <= 1 ? (
+          <span className={`${styles.pagerNav} ${styles.pagerDisabled}`}>
+            <span className={styles.pagerNavIcon} aria-hidden="true">‹</span>
+            <span className={styles.pagerNavText}>Previous</span>
+          </span>
+        ) : (
+          <Link href={previousHref} className={styles.pagerNav} aria-label="Previous page">
+            <span className={styles.pagerNavIcon} aria-hidden="true">‹</span>
+            <span className={styles.pagerNavText}>Previous</span>
+          </Link>
+        )}
+
+        <ol className={styles.pagerPages}>
+          {items.map((item, index) => (
+            item === "ellipsis" ? (
+              <li key={`ellipsis-${index}`} className={styles.pagerEllipsis} aria-hidden="true">…</li>
+            ) : (
+              <li key={item}>
+                {item === page ? (
+                  <span className={`${styles.pagerPage} ${styles.pagerCurrent}`} aria-current="page">
+                    {item}
+                  </span>
+                ) : (
+                  <Link href={blogPageHref(item)} className={styles.pagerPage}>
+                    {item}
+                  </Link>
+                )}
+              </li>
+            )
+          ))}
+        </ol>
+
+        {page >= totalPages ? (
+          <span className={`${styles.pagerNav} ${styles.pagerDisabled}`}>
+            <span className={styles.pagerNavText}>Next</span>
+            <span className={styles.pagerNavIcon} aria-hidden="true">›</span>
+          </span>
+        ) : (
+          <Link href={nextHref} className={styles.pagerNav} aria-label="Next page">
+            <span className={styles.pagerNavText}>Next</span>
+            <span className={styles.pagerNavIcon} aria-hidden="true">›</span>
+          </Link>
+        )}
+      </div>
+
+      <label className={styles.pagerJump}>
+        <span>Go to page</span>
+        <select
+          className={styles.pagerSelect}
+          value={page}
+          onChange={jumpToPage}
+          aria-label="Go to page"
+        >
+          {Array.from({ length: totalPages }, (_, index) => (
+            <option key={index + 1} value={index + 1}>{index + 1}</option>
+          ))}
+        </select>
+        <span>of {totalPages}</span>
+      </label>
+    </nav>
+  );
+}
+
+export default function BlogFeed({ initialPosts, page = 1, totalPages = 0 }) {
+  return (
     <>
-      {posts.length > 0 ? (
+      {initialPosts.length > 0 ? (
         <div className={styles.grid}>
-          {posts.map((post) => <BlogCard key={post.slug} post={post} />)}
-          {loading && [0, 1, 2].map((index) => <BlogCardSkeleton key={`loading-${index}`} />)}
+          {initialPosts.map((post) => <BlogCard key={post.slug} post={post} />)}
         </div>
       ) : (
         <p className={styles.empty}>More practical guidance is on the way.</p>
       )}
 
-      <div className={styles.pagination} aria-live="polite">
-        {error && <p className={styles.loadError}>{error}</p>}
-        {cursor && (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={loadMore}
-            disabled={loading}
-          >
-            {loading ? "Loading…" : "Next"}
-          </button>
-        )}
-      </div>
+      {totalPages > 0 && initialPosts.length > 0 && (
+        <BlogPagination page={page} totalPages={totalPages} />
+      )}
     </>
   );
 }

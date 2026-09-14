@@ -4,9 +4,10 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const limit = searchParams.get("limit") || "9";
   const cursor = searchParams.get("cursor") || undefined;
+  const page = searchParams.get("page") || undefined;
 
   try {
-    const result = await getBlogPosts({ limit, cursor });
+    const result = await getBlogPosts({ limit, cursor, page });
     return Response.json(result, {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",

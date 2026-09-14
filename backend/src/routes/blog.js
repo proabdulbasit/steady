@@ -33,7 +33,35 @@ function decodeCursor(value) {
 router.get("/posts", async (req, res) => {
   const parsedLimit = Number.parseInt(req.query.limit || "12", 10);
   const limit = Math.min(50, Math.max(1, Number.isFinite(parsedLimit) ? parsedLimit : 12));
+  const parsedPage = Number.parseInt(req.query.page || "", 10);
+  const usePage = Number.isFinite(parsedPage) && parsedPage > 0;
   const filter = { status: "published", publishedAt: { $lte: new Date() } };
+
+  if (usePage) {
+    const total = await BlogPost.countDocuments(filter);
+    const totalPages = Math.max(1, Math.ceil(total / limit) || 1);
+    const page = Math.min(parsedPage, totalPages);
+    const rows = total
+      ? await BlogPost.find(filter)
+          .select(SUMMARY_FIELDS)
+          .sort({ publishedAt: -1, _id: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .lean()
+      : [];
+    return res.json({
+      posts: rows.map(serializePostSummary),
+      page,
+      pageSize: limit,
+      total,
+      totalPages: total ? totalPages : 0,
+      pageInfo: {
+        hasMore: page < totalPages,
+        nextCursor: null,
+      },
+    });
+  }
+
   if (req.query.cursor) {
     const cursor = decodeCursor(req.query.cursor);
     filter.$or = [
