@@ -12,7 +12,7 @@ on:
       count:
         description: Maximum number of posts to process
         required: false
-        default: "3"
+        default: "1"
         type: choice
         options:
           - "1"
@@ -38,12 +38,13 @@ defaults:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       NODE_ENV: production
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
       MONGODB_DB: ${{ vars.MONGODB_DB }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_WEEKLY_API_KEY: ${{ secrets.GROQ_WEEKLY_API_KEY }}
       GROQ_CONTENT_MODEL: ${{ vars.GROQ_CONTENT_MODEL || 'openai/gpt-oss-120b' }}
       GROQ_FALLBACK_MODEL: ${{ vars.GROQ_FALLBACK_MODEL || 'openai/gpt-oss-20b' }}
       GROQ_RESEARCH_MODEL: ${{ vars.GROQ_RESEARCH_MODEL || 'openai/gpt-oss-20b' }}
@@ -52,6 +53,7 @@ jobs:
       UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
       CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
       SITE_BASE_URL: ${{ vars.SITE_BASE_URL || 'https://worksteady.app' }}
+      MAX_KEYWORD_OPPORTUNITIES: ${{ vars.MAX_KEYWORD_OPPORTUNITIES || '5' }}
       CONTENT_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.count || '1' }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
 
@@ -71,6 +73,9 @@ jobs:
 
       - name: Run blog validation tests
         run: npm run test:blog
+
+      - name: Research topics for the queue
+        run: npm run agent:weekly
 
       - name: Generate, validate, and publish
         run: npm run agent:daily

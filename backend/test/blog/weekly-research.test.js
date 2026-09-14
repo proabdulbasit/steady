@@ -4,6 +4,7 @@ const {
   compactResearchContext,
   maxOpportunities,
   normalizeOpportunity,
+  pickSeedOpportunities,
 } = require("../../scripts/blog-weekly");
 
 test("research context stays compact for Groq", () => {
@@ -62,4 +63,31 @@ test("normalizeOpportunity keeps two reachable evidence links", () => {
   assert.equal(item.keyword, "overtime scheduling");
   assert.equal(item.evidence.length, 2);
   assert.equal(item.evidence[0].url, "https://www.sba.gov/");
+});
+
+test("normalizeOpportunity fills official sources when Groq omits evidence", () => {
+  const item = normalizeOpportunity(
+    {
+      keyword: "collecting overdue invoices",
+      type: "new",
+    },
+    new Map()
+  );
+
+  assert.equal(item.keyword, "collecting overdue invoices");
+  assert.equal(item.titleSuggestion, "collecting overdue invoices");
+  assert.ok(item.evidence.length >= 1);
+  assert.match(item.evidence[0].url, /^https:\/\//);
+});
+
+test("seed topics skip keywords that are already published or queued", () => {
+  const seeds = pickSeedOpportunities(
+    [{ primaryKeyword: "collecting overdue invoices", title: "Invoices" }],
+    [{ keyword: "restaurant food cost percentage", normalizedKeyword: "restaurant food cost percentage" }],
+    2
+  );
+
+  assert.equal(seeds.length, 2);
+  assert.equal(seeds[0].keyword, "hiring your first employee");
+  assert.equal(seeds[1].keyword, "small business sales tax");
 });

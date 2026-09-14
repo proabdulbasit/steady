@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const {
+  FALLBACK_SOURCES,
   isDryRun,
   loadBackendEnv,
   safeStringArray,
@@ -36,6 +37,84 @@ function compactResearchContext(posts = [], opportunities = []) {
   };
 }
 
+const SEED_TOPICS = [
+  {
+    keyword: "collecting overdue invoices",
+    titleSuggestion: "How small businesses can collect overdue invoices without losing customers",
+    cluster: "Cash Flow",
+  },
+  {
+    keyword: "restaurant food cost percentage",
+    titleSuggestion: "A practical way to track restaurant food cost without a full-time bookkeeper",
+    cluster: "Operations",
+  },
+  {
+    keyword: "hiring your first employee",
+    titleSuggestion: "What to do before you hire your first employee",
+    cluster: "Staffing",
+  },
+  {
+    keyword: "small business sales tax",
+    titleSuggestion: "A simple sales-tax checklist for small-business owners",
+    cluster: "Finance",
+  },
+  {
+    keyword: "service business pricing",
+    titleSuggestion: "How to price a service business without guessing",
+    cluster: "Revenue",
+  },
+  {
+    keyword: "retail inventory shrinkage",
+    titleSuggestion: "How small retailers can cut inventory shrinkage this month",
+    cluster: "Operations",
+  },
+  {
+    keyword: "customer refund policy",
+    titleSuggestion: "Write a refund policy that protects cash and keeps customers",
+    cluster: "Customers",
+  },
+  {
+    keyword: "vendor payment terms",
+    titleSuggestion: "How to negotiate vendor payment terms when cash is tight",
+    cluster: "Cash Flow",
+  },
+  {
+    keyword: "employee handbook essentials",
+    titleSuggestion: "The employee handbook pages a small business actually needs",
+    cluster: "Staffing",
+  },
+  {
+    keyword: "late payroll tax deposits",
+    titleSuggestion: "What to do if payroll tax deposits are running late",
+    cluster: "Finance",
+  },
+];
+
+function pickSeedOpportunities(posts = [], opportunities = [], count = 1) {
+  const used = new Set(
+    [
+      ...posts.map((post) => normalizeText(post.primaryKeyword || post.title)),
+      ...opportunities.map((item) => item.normalizedKeyword || normalizeText(item.keyword)),
+    ].filter(Boolean)
+  );
+  return SEED_TOPICS.map((topic) =>
+    normalizeOpportunity(
+      {
+        ...topic,
+        type: "new",
+        searchIntent: "informational",
+        rationale: `Practical next steps on ${topic.keyword} for owners running a real business.`,
+        businessRelevance: 86,
+        evidence: FALLBACK_SOURCES,
+      },
+      new Map()
+    )
+  )
+    .filter(Boolean)
+    .filter((candidate) => !used.has(candidate.normalizedKeyword))
+    .slice(0, Math.max(1, count));
+}
+
 function normalizeOpportunity(item, postsBySlug) {
   const type = ["new", "update", "consolidate"].includes(item.type)
     ? item.type
@@ -57,10 +136,17 @@ function normalizeOpportunity(item, postsBySlug) {
   if (type === "consolidate" && !mergePosts.length) return null;
   const keyword = String(item.keyword || "").trim();
   const normalizedKeyword = normalizeText(keyword);
-  const relevance = Math.round(Number(item.businessRelevance));
-  if (!keyword || !item.titleSuggestion || !item.cluster || !item.rationale) return null;
+  const titleSuggestion = String(item.titleSuggestion || keyword).trim();
+  const cluster = String(item.cluster || "Business Operations").trim();
+  const rationale = String(
+    item.rationale || `Practical guidance on ${keyword} for small-business owners.`
+  ).trim();
+  const relevance = Number.isFinite(Number(item.businessRelevance))
+    ? Math.round(Number(item.businessRelevance))
+    : 80;
+  if (!keyword || !titleSuggestion || !cluster || !rationale) return null;
   if (!normalizedKeyword) return null;
-  if (!Number.isFinite(relevance) || relevance < 60 || relevance > 100) return null;
+  if (relevance < 60 || relevance > 100) return null;
   const evidence = (Array.isArray(item.evidence) ? item.evidence : [])
     .filter((source) => source?.title && /^https:\/\//.test(source?.url || ""))
     .map((source) => ({
@@ -69,23 +155,23 @@ function normalizeOpportunity(item, postsBySlug) {
       publisher: String(source.publisher || ""),
     }))
     .slice(0, 2);
-  if (!evidence.length) return null;
+  const sourced = evidence.length ? evidence : FALLBACK_SOURCES.slice(0, 2);
   return {
     keyword,
     normalizedKeyword,
-    titleSuggestion: String(item.titleSuggestion).trim(),
+    titleSuggestion,
     type,
     searchIntent: ["informational", "commercial", "transactional", "navigational"].includes(
       item.searchIntent
     )
       ? item.searchIntent
       : "informational",
-    cluster: String(item.cluster).trim(),
+    cluster,
     secondaryKeywords: safeStringArray(item.secondaryKeywords),
     questions: safeStringArray(item.questions),
-    rationale: String(item.rationale).trim(),
+    rationale,
     businessRelevance: relevance,
-    evidence,
+    evidence: sourced,
     existingPostId: existing?._id || null,
     mergePostIds: mergePosts.map((post) => post._id),
   };
@@ -155,11 +241,14 @@ ${JSON.stringify(context.opportunities)}`,
         maxTokens: 8000,
       }
     );
+    const rawOpportunities = Array.isArray(structured.data?.opportunities)
+      ? structured.data.opportunities
+      : [];
     const postsBySlug = new Map(posts.map((post) => [post.slug, post]));
     const queuedKeywords = new Set(
       opportunities.map((item) => item.normalizedKeyword).filter(Boolean)
     );
-    const candidates = (structured.data.opportunities || [])
+    let candidates = rawOpportunities
       .map((item) => normalizeOpportunity(item, postsBySlug))
       .filter(Boolean)
       .filter((candidate) => {
@@ -182,6 +271,18 @@ ${JSON.stringify(context.opportunities)}`,
         });
       })
       .slice(0, maxOpportunities());
+    let usedSeedTopics = false;
+    if (!candidates.length) {
+      candidates = pickSeedOpportunities(posts, opportunities, maxOpportunities());
+      usedSeedTopics = true;
+    }
+    console.log(
+      JSON.stringify({
+        rawOpportunities: rawOpportunities.length,
+        queued: candidates.length,
+        usedSeedTopics,
+      })
+    );
 
     let saved = 0;
     if (!dryRun) {
@@ -235,6 +336,10 @@ if (require.main === module) {
   runWeekly()
     .then((result) => {
       console.log(JSON.stringify({ ...result, candidates: undefined }, null, 2));
+      if (!result.dryRun && result.saved === 0) {
+        console.error("[blog-weekly] No new topics were saved, so publishing has nothing to claim.");
+        process.exitCode = 1;
+      }
     })
     .catch((error) => {
       console.error("[blog-weekly]", error);
@@ -247,5 +352,6 @@ module.exports = {
   compactResearchContext,
   maxOpportunities,
   normalizeOpportunity,
+  pickSeedOpportunities,
   runWeekly,
 };
