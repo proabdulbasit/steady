@@ -98,22 +98,54 @@ async function sendViaMailgun({ to, subject, text, html, from }) {
   return { ok: true, messageId: typeof data?.id === "string" ? data.id : undefined };
 }
 
+function escapeHtml(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildPasswordResetHtml(resetUrl) {
+  const safeUrl = escapeHtml(resetUrl);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reset your WorkSteady password</title>
+</head>
+<body style="margin:0;padding:0;background:#f6f4ef;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    Use this link to choose a new WorkSteady password. It expires in one hour.
+  </div>
+  <div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">
+    <p style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#c9a227;margin:0 0 16px;">WorkSteady</p>
+    <h1 style="font-size:22px;line-height:1.3;margin:0 0 16px;">Reset your password</h1>
+    <p style="font-size:15px;line-height:1.55;color:#444;">Someone requested a password reset for your WorkSteady account. This link expires in one hour.</p>
+    <p style="margin:28px 0;">
+      <a href="${safeUrl}" style="display:inline-block;background:#c9a227;color:#1a1a1a;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:700;">Reset your password</a>
+    </p>
+    <p style="font-size:13px;line-height:1.55;color:#666;word-break:break-all;">If the button does not work, copy and paste this URL into your browser:<br>${safeUrl}</p>
+    <p style="font-size:13px;color:#888;">If you did not request this, you can ignore this email. Your password will not change.</p>
+  </div>
+</body>
+</html>`;
+}
+
 async function sendPasswordResetEmail({ to, resetUrl }) {
   const from = resolveFromAddress();
-  const subject = "Reset your Steady password";
-  const text = `Someone requested a password reset for your Steady account.
+  const subject = "Reset your WorkSteady password";
+  const text = `Someone requested a password reset for your WorkSteady account.
 
 Open this link to choose a new password (it expires in one hour):
 
 ${resetUrl}
 
-If you did not request this, you can ignore this email.`;
+If you did not request this, you can ignore this email. Your password will not change.
 
-  const html = `
-    <p>Someone requested a password reset for your Steady account.</p>
-    <p><a href="${resetUrl}">Reset your password</a></p>
-    <p>If you did not request this, you can ignore this email.</p>
-  `.trim();
+— WorkSteady`;
+  const html = buildPasswordResetHtml(resetUrl);
 
   try {
     const mg = await sendViaMailgun({ to, subject, text, html, from });
@@ -147,14 +179,6 @@ If you did not request this, you can ignore this email.`;
 function getFrontendOrigin() {
   const raw = process.env.FRONTEND_URL || process.env.APP_PUBLIC_URL || "";
   return typeof raw === "string" ? raw.replace(/\/$/, "") : "http://localhost:3000";
-}
-
-function escapeHtml(s) {
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 async function sendTransactionalEmail({ to, subject, text, html }) {
