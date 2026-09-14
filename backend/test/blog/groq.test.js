@@ -81,6 +81,7 @@ test("search-source extraction ignores duplicate and non-HTTPS results", () => {
             { title: "Primary", url: "https://example.com/source" },
             { title: "Duplicate", url: "https://example.com/source" },
             { title: "Unsafe", url: "http://example.com/source" },
+            { title: "Broken", url: "https://" },
           ],
         }],
       },

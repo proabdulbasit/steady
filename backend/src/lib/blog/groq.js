@@ -156,7 +156,17 @@ ${content.slice(-tailLength)}`,
 
 function extractHttpsUrls(text) {
   const matches = String(text || "").match(/https:\/\/[^\s)\]>'"]+/gi) || [];
-  return [...new Set(matches.map((url) => url.replace(/[.,;:]+$/, "")))];
+  return [...new Set(
+    matches
+      .map((url) => url.replace(/[.,;:]+$/, ""))
+      .filter((url) => {
+        try {
+          return Boolean(new URL(url).hostname);
+        } catch {
+          return false;
+        }
+      })
+  )];
 }
 
 function extractSearchSources(body) {
@@ -168,13 +178,17 @@ function extractSearchSources(body) {
   const sources = [];
   const pushUrl = (title, url, publisher) => {
     if (!url || !/^https:\/\//i.test(url)) return;
-    sources.push({
-      title: String(title || new URL(url).hostname),
-      url: String(url),
-      publisher: String(
-        publisher || new URL(url).hostname.replace(/^www\./, "")
-      ),
-    });
+    try {
+      const parsed = new URL(url);
+      if (!parsed.hostname) return;
+      sources.push({
+        title: String(title || parsed.hostname),
+        url: parsed.toString(),
+        publisher: String(publisher || parsed.hostname.replace(/^www\./, "")),
+      });
+    } catch {
+      return;
+    }
   };
   for (const tool of tools) {
     const searchResults = Array.isArray(tool?.search_results)
