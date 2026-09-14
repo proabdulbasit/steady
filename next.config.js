@@ -16,6 +16,18 @@ const nextConfig = {
     root: __dirname,
   },
   async headers() {
+    const securityHeaders = [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+        ],
+      },
+    ];
+
     const privateRoutes = [
       "login",
       "register",
@@ -27,7 +39,7 @@ const nextConfig = {
       "tools",
     ];
 
-    return privateRoutes.map((route) => ({
+    const privateHeaders = privateRoutes.map((route) => ({
       source: `/${route}/:path*`,
       headers: [
         {
@@ -36,8 +48,9 @@ const nextConfig = {
         },
       ],
     }));
+
+    return [...securityHeaders, ...privateHeaders];
   },
 };
 
 module.exports = nextConfig;
-

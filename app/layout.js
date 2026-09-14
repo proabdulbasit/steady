@@ -1,4 +1,6 @@
+import Script from "next/script";
 import "./globals.css";
+import { GTM_ID, GTM_INLINE_SCRIPT, hreflangAlternates } from "../lib/seo";
 
 const siteDescription =
   "Straight-talking AI guidance and practical next moves for people running real small businesses.";
@@ -17,7 +19,15 @@ export const metadata = {
   verification: {
     google: "Voum7juu4mnUgw5Lmi2sb3Bj-jOEHkZfxIooPhgqPBA",
   },
-  alternates: { canonical: "/" },
+  alternates: hreflangAlternates("/"),
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicon.ico"],
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -71,8 +81,19 @@ function jsonLd(value) {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning>
+    <html lang="en-US" data-theme="light" suppressHydrationWarning>
       <body>
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
+            height="0"
+            width="0"
+            style={{ display: "none", visibility: "hidden" }}
+          />
+        </noscript>
+        <Script id="gtm-base" strategy="afterInteractive">
+          {GTM_INLINE_SCRIPT}
+        </Script>
         <Providers>{children}</Providers>
         <script
           type="application/ld+json"

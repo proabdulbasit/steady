@@ -6,11 +6,13 @@ import remarkGfm from "remark-gfm";
 import { TrendingPost } from "../../components/blog-feed";
 import {
   BlogNotFoundError,
+  BlogBackendError,
   canonicalPostUrl,
   getBlogPost,
   getBlogPosts,
   normalizeSlug,
 } from "../../lib/blog-server";
+import { hreflangAlternates } from "../../lib/seo";
 import styles from "./article.module.css";
 
 export const revalidate = 900;
@@ -132,6 +134,9 @@ function safeJsonLd(value) {
 
 async function loadArticle(rawSlug) {
   const normalized = normalizeSlug(rawSlug);
+  if (!isValidBlogSlug(normalized)) {
+    notFound();
+  }
   if (String(rawSlug) !== normalized) {
     permanentRedirect(`/${encodeURIComponent(normalized)}`);
   }

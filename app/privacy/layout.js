@@ -1,6 +1,8 @@
+import { hreflangAlternates } from "../../lib/seo";
+
 export const metadata = {
   title: "Privacy",
-  alternates: { canonical: "/privacy" },
+  alternates: hreflangAlternates("/privacy"),
 };
 
 export default function PrivacyLayout({ children }) {

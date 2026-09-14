@@ -1,3 +1,4 @@
+import { hreflangAlternates } from "../../lib/seo";
 import BlogHero from "./blog-hero";
 import styles from "./blog.module.css";
 
@@ -5,7 +6,7 @@ export const metadata = {
   title: "Small Business Advice",
   description:
     "Practical, plain-spoken guidance for small business owners—from pricing and cash flow to hiring, customers, and day-to-day operations.",
-  alternates: { canonical: "/blog" },
+  alternates: hreflangAlternates("/blog"),
   openGraph: {
     title: "WorkSteady Small Business Advice",
     description:
