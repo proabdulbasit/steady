@@ -88,31 +88,142 @@ const SEED_TOPICS = [
     titleSuggestion: "What to do if payroll tax deposits are running late",
     cluster: "Finance",
   },
+  {
+    keyword: "raise prices without losing customers",
+    titleSuggestion: "How to raise prices without losing your best customers",
+    cluster: "Revenue",
+  },
+  {
+    keyword: "small business cash flow forecast",
+    titleSuggestion: "A simple cash-flow forecast you can update every Monday",
+    cluster: "Cash Flow",
+  },
+  {
+    keyword: "fire a bad employee legally",
+    titleSuggestion: "How to fire a bad employee without creating a legal mess",
+    cluster: "Staffing",
+  },
+  {
+    keyword: "respond to a bad online review",
+    titleSuggestion: "How to respond to a bad online review without making it worse",
+    cluster: "Customers",
+  },
+  {
+    keyword: "cut overtime costs",
+    titleSuggestion: "Practical ways to cut overtime costs without burning out your team",
+    cluster: "Staffing",
+  },
+  {
+    keyword: "choose a bookkeeper",
+    titleSuggestion: "How to choose a bookkeeper when your business outgrows spreadsheets",
+    cluster: "Finance",
+  },
+  {
+    keyword: "supplier price increases",
+    titleSuggestion: "What to do when suppliers raise prices mid-season",
+    cluster: "Operations",
+  },
+  {
+    keyword: "small business marketing budget",
+    titleSuggestion: "How to set a marketing budget that does not waste cash",
+    cluster: "Revenue",
+  },
+  {
+    keyword: "track job profitability",
+    titleSuggestion: "How service businesses can track job profitability weekly",
+    cluster: "Revenue",
+  },
+  {
+    keyword: "handle no-show customers",
+    titleSuggestion: "How to handle no-show customers without killing goodwill",
+    cluster: "Customers",
+  },
 ];
 
-function pickSeedOpportunities(posts = [], opportunities = [], count = 1) {
-  const used = new Set(
+function usedKeywordSet(posts = [], opportunities = []) {
+  return new Set(
     [
       ...posts.map((post) => normalizeText(post.primaryKeyword || post.title)),
       ...opportunities.map((item) => item.normalizedKeyword || normalizeText(item.keyword)),
     ].filter(Boolean)
   );
-  return SEED_TOPICS.map((topic) =>
-    normalizeOpportunity(
-      {
-        ...topic,
-        type: "new",
-        searchIntent: "informational",
-        rationale: `Practical next steps on ${topic.keyword} for owners running a real business.`,
-        businessRelevance: 86,
-        evidence: FALLBACK_SOURCES,
-      },
-      new Map()
-    )
-  )
+}
+
+function toSeedOpportunity(topic) {
+  return normalizeOpportunity(
+    {
+      ...topic,
+      type: "new",
+      searchIntent: "informational",
+      rationale: `Practical next steps on ${topic.keyword} for owners running a real business.`,
+      businessRelevance: 86,
+      evidence: FALLBACK_SOURCES,
+    },
+    new Map()
+  );
+}
+
+function pickSeedOpportunities(posts = [], opportunities = [], count = 1) {
+  const used = usedKeywordSet(posts, opportunities);
+  return SEED_TOPICS.map(toSeedOpportunity)
     .filter(Boolean)
     .filter((candidate) => !used.has(candidate.normalizedKeyword))
     .slice(0, Math.max(1, count));
+}
+
+/**
+ * When static seeds are exhausted, mint unique dated angles so publish never
+ * stalls for days with an empty approved queue.
+ */
+function pickFreshSeedOpportunities(posts = [], opportunities = [], count = 1) {
+  const used = usedKeywordSet(posts, opportunities);
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  const stamp = `${month} ${day} ${year}`;
+  const angles = [
+    (topic) => ({
+      keyword: `${topic.keyword} ${year}`,
+      titleSuggestion: `${topic.titleSuggestion} (${year})`,
+      cluster: topic.cluster,
+    }),
+    (topic) => ({
+      keyword: `${topic.keyword} for busy owners`,
+      titleSuggestion: `${topic.titleSuggestion} when time is short`,
+      cluster: topic.cluster,
+    }),
+    (topic) => ({
+      keyword: `${topic.keyword} checklist ${month} ${year}`,
+      titleSuggestion: `${topic.titleSuggestion}: a ${stamp} checklist`,
+      cluster: topic.cluster,
+    }),
+  ];
+
+  const fresh = [];
+  for (const angle of angles) {
+    for (const topic of SEED_TOPICS) {
+      const candidate = toSeedOpportunity(angle(topic));
+      if (!candidate || used.has(candidate.normalizedKeyword)) continue;
+      used.add(candidate.normalizedKeyword);
+      fresh.push(candidate);
+      if (fresh.length >= Math.max(1, count)) return fresh;
+    }
+  }
+  return fresh;
+}
+
+function ensureSeedCandidates(posts, opportunities, count, existingCandidates = []) {
+  if (existingCandidates.length) return { candidates: existingCandidates, usedSeedTopics: false, usedFreshSeeds: false };
+  let candidates = pickSeedOpportunities(posts, opportunities, count);
+  let usedSeedTopics = candidates.length > 0;
+  let usedFreshSeeds = false;
+  if (!candidates.length) {
+    candidates = pickFreshSeedOpportunities(posts, opportunities, count);
+    usedFreshSeeds = candidates.length > 0;
+    usedSeedTopics = usedFreshSeeds;
+  }
+  return { candidates, usedSeedTopics, usedFreshSeeds };
 }
 
 function normalizeOpportunity(item, postsBySlug) {
@@ -271,16 +382,14 @@ ${JSON.stringify(context.opportunities)}`,
         });
       })
       .slice(0, maxOpportunities());
-    let usedSeedTopics = false;
-    if (!candidates.length) {
-      candidates = pickSeedOpportunities(posts, opportunities, maxOpportunities());
-      usedSeedTopics = true;
-    }
+    const seeded = ensureSeedCandidates(posts, opportunities, maxOpportunities(), candidates);
+    candidates = seeded.candidates;
     console.log(
       JSON.stringify({
         rawOpportunities: rawOpportunities.length,
         queued: candidates.length,
-        usedSeedTopics,
+        usedSeedTopics: seeded.usedSeedTopics,
+        usedFreshSeeds: seeded.usedFreshSeeds,
       })
     );
 
@@ -334,11 +443,20 @@ ${JSON.stringify(context.opportunities)}`,
 
 if (require.main === module) {
   runWeekly()
-    .then((result) => {
+    .then(async (result) => {
       console.log(JSON.stringify({ ...result, candidates: undefined }, null, 2));
       if (!result.dryRun && result.saved === 0) {
-        console.error("[blog-weekly] No new topics were saved, so publishing has nothing to claim.");
-        process.exitCode = 1;
+        const approvedWaiting = await KeywordOpportunity.countDocuments({ status: "approved" });
+        if (approvedWaiting > 0) {
+          console.warn(
+            `[blog-weekly] No new topics were saved, but ${approvedWaiting} approved topic(s) remain in the queue for publishing.`
+          );
+          return;
+        }
+        console.warn(
+          "[blog-weekly] No new topics were saved and the approved queue is empty. Publishing may skip this window."
+        );
+        // Successful research with nothing new is not a hard failure — do not block publish.
       }
     })
     .catch((error) => {
@@ -350,8 +468,10 @@ if (require.main === module) {
 
 module.exports = {
   compactResearchContext,
+  ensureSeedCandidates,
   maxOpportunities,
   normalizeOpportunity,
+  pickFreshSeedOpportunities,
   pickSeedOpportunities,
   runWeekly,
 };

@@ -142,7 +142,7 @@ async function loadArticle(rawSlug) {
   }
 
   try {
-    const result = await getBlogPost(normalized);
+    const result = await getBlogPost(normalized, { allowCdnFallback: true });
     if (result.redirectTo) {
       permanentRedirect(`/${encodeURIComponent(result.redirectTo)}`);
     }
