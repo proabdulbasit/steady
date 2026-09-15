@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import BlogFeed, { BlogCardSkeletonGrid } from "../../components/blog-feed";
-import { getBlogPosts } from "../../lib/blog-server";
+import { BlogBackendError, getBlogPosts } from "../../lib/blog-server";
+import BlogUnavailable from "./blog-unavailable";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 120;
 
 function parsePage(value) {
   const page = Number.parseInt(String(value || "1"), 10);
@@ -11,15 +11,23 @@ function parsePage(value) {
 }
 
 async function BlogFeedSection({ page }) {
-  const result = await getBlogPosts({ limit: 9, page });
-  const validPosts = result.posts.filter((post) => post?.slug && post?.title);
-  return (
-    <BlogFeed
-      initialPosts={validPosts}
-      page={result.page}
-      totalPages={result.totalPages}
-    />
-  );
+  try {
+    const result = await getBlogPosts({ limit: 9, page, allowCdnFallback: true });
+    const validPosts = result.posts.filter((post) => post?.slug && post?.title);
+    return (
+      <BlogFeed
+        initialPosts={validPosts}
+        page={result.page}
+        totalPages={result.totalPages}
+      />
+    );
+  } catch (error) {
+    if (error instanceof BlogBackendError) {
+      console.error("[blog] Listing unavailable:", error.message);
+      return <BlogUnavailable />;
+    }
+    throw error;
+  }
 }
 
 export default async function BlogPage({ searchParams }) {

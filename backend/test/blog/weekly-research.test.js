@@ -91,3 +91,39 @@ test("seed topics skip keywords that are already published or queued", () => {
   assert.equal(seeds[0].keyword, "hiring your first employee");
   assert.equal(seeds[1].keyword, "small business sales tax");
 });
+
+test("fresh seeds refill the queue after static seeds are exhausted", () => {
+  const { pickFreshSeedOpportunities, ensureSeedCandidates } = require("../../scripts/blog-weekly");
+  const posts = [
+    { primaryKeyword: "collecting overdue invoices" },
+    { primaryKeyword: "restaurant food cost percentage" },
+    { primaryKeyword: "hiring your first employee" },
+    { primaryKeyword: "small business sales tax" },
+    { primaryKeyword: "service business pricing" },
+    { primaryKeyword: "retail inventory shrinkage" },
+    { primaryKeyword: "customer refund policy" },
+    { primaryKeyword: "vendor payment terms" },
+    { primaryKeyword: "employee handbook essentials" },
+    { primaryKeyword: "late payroll tax deposits" },
+    { primaryKeyword: "raise prices without losing customers" },
+    { primaryKeyword: "small business cash flow forecast" },
+    { primaryKeyword: "fire a bad employee legally" },
+    { primaryKeyword: "respond to a bad online review" },
+    { primaryKeyword: "cut overtime costs" },
+    { primaryKeyword: "choose a bookkeeper" },
+    { primaryKeyword: "supplier price increases" },
+    { primaryKeyword: "small business marketing budget" },
+    { primaryKeyword: "track job profitability" },
+    { primaryKeyword: "handle no-show customers" },
+  ];
+  const staticSeeds = pickSeedOpportunities(posts, [], 3);
+  assert.equal(staticSeeds.length, 0);
+
+  const fresh = pickFreshSeedOpportunities(posts, [], 2);
+  assert.equal(fresh.length, 2);
+  assert.match(fresh[0].keyword, /\d{4}|busy owners|checklist/i);
+
+  const ensured = ensureSeedCandidates(posts, [], 2, []);
+  assert.equal(ensured.candidates.length, 2);
+  assert.equal(ensured.usedFreshSeeds, true);
+});

@@ -616,10 +616,14 @@ if (require.main === module) {
       const published = (result.results || []).filter((item) => item.publish).length;
       const refreshed = (result.imageRefreshes || []).filter((item) => item.provider).length;
       if (!result.dryRun && published === 0 && refreshed === 0) {
+        if (result.claimed === 0) {
+          console.warn(
+            "[blog-daily] No approved topics were queued for this window. Research will refill before the next run."
+          );
+          return;
+        }
         console.error(
-          result.claimed === 0
-            ? "[blog-daily] No posts were published because no approved topics were queued. Run Research WorkSteady blog opportunities first."
-            : "[blog-daily] No posts were published. The daily workflow must publish at least one article."
+          "[blog-daily] No posts were published. The daily workflow must publish at least one article."
         );
         process.exitCode = 1;
       }

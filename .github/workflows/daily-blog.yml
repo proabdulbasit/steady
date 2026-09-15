@@ -75,6 +75,8 @@ jobs:
         run: npm run test:blog
 
       - name: Research topics for the queue
+        # Empty research is a valid outcome; publishing can still claim existing topics.
+        continue-on-error: true
         run: npm run agent:weekly
 
       - name: Generate, validate, and publish
