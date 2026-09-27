@@ -223,7 +223,7 @@ class GroqClient {
     this.searchModel =
       options.searchModel ||
       process.env.GROQ_SEARCH_MODEL ||
-      "groq/compound-mini";
+      "openai/gpt-oss-20b";
     this.contentModel =
       options.contentModel || process.env.GROQ_CONTENT_MODEL || "openai/gpt-oss-120b";
     this.fallbackModel =
@@ -396,24 +396,28 @@ class GroqClient {
       ],
       6000
     );
+
+    const runSearch = (model, withBrowserSearch) =>
+      this.chat(messages, {
+        model,
+        research: true,
+        webSearch: withBrowserSearch,
+        temperature: 0.1,
+        maxTokens: withBrowserSearch ? 8000 : 1800,
+      });
+
+    // Compound systems have built-in tools; GPT-OSS models need browser_search.
+    const searchUsesBrowserTool = !String(this.searchModel).startsWith("groq/compound");
     try {
-      return await this.chat(messages, {
-        model: this.searchModel,
-        research: true,
-        temperature: 0.1,
-        maxTokens: 1800,
-      });
+      return await runSearch(this.searchModel, searchUsesBrowserTool);
     } catch (error) {
-      if (error.status !== 413 && !/empty completion/i.test(error.message || "")) {
-        throw error;
-      }
-      return this.chat(messages, {
-        model: this.researchModel,
-        research: true,
-        webSearch: true,
-        temperature: 0.1,
-        maxTokens: 8000,
-      });
+      const shouldFallback =
+        error.status === 413 ||
+        error.status === 404 ||
+        error.status === 400 ||
+        /does not exist|do not have access|empty completion/i.test(error.message || "");
+      if (!shouldFallback) throw error;
+      return runSearch(this.researchModel, true);
     }
   }
 }

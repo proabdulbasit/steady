@@ -48,6 +48,7 @@ jobs:
       GROQ_CONTENT_MODEL: ${{ vars.GROQ_CONTENT_MODEL || 'openai/gpt-oss-120b' }}
       GROQ_FALLBACK_MODEL: ${{ vars.GROQ_FALLBACK_MODEL || 'openai/gpt-oss-20b' }}
       GROQ_RESEARCH_MODEL: ${{ vars.GROQ_RESEARCH_MODEL || 'openai/gpt-oss-20b' }}
+      GROQ_SEARCH_MODEL: ${{ vars.GROQ_SEARCH_MODEL || 'openai/gpt-oss-20b' }}
       GROQ_RETRY_WAIT_MS: "65000"
       REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
       UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}

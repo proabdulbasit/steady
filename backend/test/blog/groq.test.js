@@ -30,20 +30,20 @@ test("Groq retry timing understands rate-limit headers and messages", () => {
   assert.equal(retryAfterMs(response, "Please try again in 376ms"), 1500);
 });
 
-test("research uses Compound Mini and exposes raw search-result URLs", async () => {
+test("research uses GPT-OSS browser search and exposes raw search-result URLs", async () => {
   let requestBody;
   const client = new GroqClient({
     apiKey: "test-key",
-    searchModel: "groq/compound-mini",
+    searchModel: "openai/gpt-oss-20b",
     maxRetries: 0,
     fetch: async (_url, options) => {
       requestBody = JSON.parse(options.body);
       return new Response(
         JSON.stringify({
-          model: "groq/compound-mini",
+          model: "openai/gpt-oss-20b",
           choices: [{
             message: {
-              content: "Grounded research",
+              content: "Grounded research. See https://example.com/scheduling",
               executed_tools: [{
                 search_results: {
                   results: [{
@@ -62,13 +62,36 @@ test("research uses Compound Mini and exposes raw search-result URLs", async () 
 
   const result = await client.research("Find a current small-business operations topic.");
 
-  assert.equal(requestBody.model, "groq/compound-mini");
-  assert.equal(requestBody.tools, undefined);
+  assert.equal(requestBody.model, "openai/gpt-oss-20b");
+  assert.deepEqual(requestBody.tools, [{ type: "browser_search" }]);
   assert.deepEqual(result.sources, [{
     title: "Scheduling guidance",
     url: "https://example.com/scheduling",
     publisher: "example.com",
   }]);
+});
+
+test("compound research keeps built-in tools instead of browser_search", async () => {
+  let requestBody;
+  const client = new GroqClient({
+    apiKey: "test-key",
+    searchModel: "groq/compound-mini",
+    maxRetries: 0,
+    fetch: async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return new Response(
+        JSON.stringify({
+          model: "groq/compound-mini",
+          choices: [{ message: { content: "Grounded research" } }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    },
+  });
+
+  await client.research("Find a current small-business operations topic.");
+  assert.equal(requestBody.model, "groq/compound-mini");
+  assert.equal(requestBody.tools, undefined);
 });
 
 test("search-source extraction ignores duplicate and non-HTTPS results", () => {
@@ -159,6 +182,42 @@ test("research falls back to GPT-OSS browser search after a 413", async () => {
   const result = await client.research("Find official tax guidance.");
   assert.deepEqual(models, ["groq/compound-mini", "openai/gpt-oss-20b"]);
   assert.match(result.content, /irs\.gov/);
+});
+
+test("research falls back when Compound Mini is unavailable", async () => {
+  const models = [];
+  const client = new GroqClient({
+    apiKey: "test-key",
+    searchModel: "groq/compound-mini",
+    researchModel: "openai/gpt-oss-20b",
+    maxRetries: 0,
+    fetch: async (_url, options) => {
+      const body = JSON.parse(options.body);
+      models.push(body.model);
+      if (body.model === "groq/compound-mini") {
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: "The model `groq/compound-mini` does not exist or you do not have access to it.",
+            },
+          }),
+          { status: 404, headers: { "content-type": "application/json" } }
+        );
+      }
+      assert.deepEqual(body.tools, [{ type: "browser_search" }]);
+      return new Response(
+        JSON.stringify({
+          model: body.model,
+          choices: [{ message: { content: "Use https://www.sba.gov/" } }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    },
+  });
+
+  const result = await client.research("Find SBA guidance.");
+  assert.deepEqual(models, ["groq/compound-mini", "openai/gpt-oss-20b"]);
+  assert.match(result.content, /sba\.gov/);
 });
 
 test("empty browser-search completions retry with a larger output budget", async () => {
