@@ -119,6 +119,29 @@ test("source validation retries GET when HEAD is blocked or missing", async () =
   assert.match(result.broken.join(" "), /placeholder host|HTTP 404/);
 });
 
+test("source validation retries GET with a fresh timeout after HEAD aborts", async () => {
+  const calls = [];
+  const post = {
+    sourceReferences: [{ url: "https://www.sba.gov/prompt-pay" }],
+  };
+  const result = await validateReachableSources(post, {
+    timeoutMs: 50,
+    fetch: async (url, options) => {
+      calls.push(options.method);
+      if (options.method === "HEAD") {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        throw error;
+      }
+      return new Response("ok", { status: 200 });
+    },
+  });
+
+  assert.deepEqual(calls, ["HEAD", "GET"]);
+  assert.deepEqual(result.reachable, ["https://www.sba.gov/prompt-pay"]);
+  assert.deepEqual(result.broken, []);
+});
+
 test("source validation identifies the exact reachable URLs", async () => {
   const post = {
     sourceReferences: [
