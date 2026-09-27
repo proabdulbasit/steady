@@ -87,7 +87,7 @@ function repeatedParagraphRatio(content) {
 async function validateReachableSources(post, options = {}) {
   const fetchImpl = options.fetch || global.fetch;
   if (typeof fetchImpl !== "function") {
-    return { checked: 0, broken: ["Source checking is unavailable."] };
+    return { checked: 0, broken: ["Source checking is unavailable."], reachable: [] };
   }
   const timeoutMs = options.timeoutMs || 10000;
   const urls = [
@@ -99,45 +99,45 @@ async function validateReachableSources(post, options = {}) {
   ];
   const broken = [];
   const reachable = [];
+
+  async function probe(url, method) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const headers = { "User-Agent": "WorkSteadyEditorialBot/1.0" };
+      const init = {
+        method,
+        redirect: "follow",
+        headers:
+          method === "GET"
+            ? { ...headers, Range: "bytes=0-1023" }
+            : headers,
+        signal: controller.signal,
+      };
+      return await fetchImpl(url, init);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   for (const url of urls) {
     if (isPlaceholderHost(url)) {
       broken.push(`${url} is a placeholder host`);
       continue;
     }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const headers = { "User-Agent": "WorkSteadyEditorialBot/1.0" };
-      let response = await fetchImpl(url, {
-        method: "HEAD",
-        redirect: "follow",
-        headers,
-        signal: controller.signal,
-      });
+      let response = await probe(url, "HEAD");
       if (isBrokenStatus(response.status) || response.status === 405 || response.status === 403) {
-        response = await fetchImpl(url, {
-          method: "GET",
-          redirect: "follow",
-          headers: { ...headers, Range: "bytes=0-1023" },
-          signal: controller.signal,
-        });
+        response = await probe(url, "GET");
       }
       if (isBrokenStatus(response.status)) {
         broken.push(`${url} returned HTTP ${response.status}`);
       } else {
         reachable.push(url);
       }
-    } catch (error) {
+    } catch {
       try {
-        const response = await fetchImpl(url, {
-          method: "GET",
-          redirect: "follow",
-          headers: {
-            "User-Agent": "WorkSteadyEditorialBot/1.0",
-            Range: "bytes=0-1023",
-          },
-          signal: controller.signal,
-        });
+        const response = await probe(url, "GET");
         if (isBrokenStatus(response.status)) {
           broken.push(`${url} returned HTTP ${response.status}`);
         } else {
@@ -145,11 +145,9 @@ async function validateReachableSources(post, options = {}) {
         }
       } catch (retryError) {
         broken.push(
-          `${url} could not be reached (${retryError.name || error.name || "network error"})`
+          `${url} could not be reached (${retryError.name || "network error"})`
         );
       }
-    } finally {
-      clearTimeout(timer);
     }
   }
   return { checked: urls.length, broken, reachable };
