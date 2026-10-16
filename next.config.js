@@ -15,6 +15,13 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  async rewrites() {
+    // Serve the dynamic XML sitemap at the standard URLs (also mirrored in vercel.json).
+    return [
+      { source: "/sitemap.xml", destination: "/api/sitemap" },
+      { source: "/page-sitemap.xml", destination: "/api/sitemap" },
+    ];
+  },
   async headers() {
     const securityHeaders = [
       {

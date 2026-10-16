@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const BlogPost = require("../models/BlogPost");
+const { getSiteBaseUrl } = require("../lib/blog/constants");
 const { serializePost, serializePostSummary } = require("../lib/blog/serialize");
 
 const router = express.Router();
@@ -116,14 +117,31 @@ router.get("/sitemap", async (_req, res) => {
     status: "published",
     publishedAt: { $lte: new Date() },
   })
-    .select("canonicalUrl updatedAt publishedAt")
+    .select("slug canonicalUrl updatedAt publishedAt")
     .sort({ publishedAt: -1 })
     .lean();
+  const siteBase = getSiteBaseUrl();
+  const mapped = posts
+    .filter((post) => post?.slug)
+    .map((post) => {
+      const lastmod = (post.updatedAt || post.publishedAt || new Date()).toISOString();
+      const loc =
+        typeof post.canonicalUrl === "string" && post.canonicalUrl.startsWith("https://")
+          ? post.canonicalUrl
+          : `${siteBase}/${encodeURIComponent(String(post.slug).toLowerCase())}`;
+      return {
+        slug: String(post.slug).toLowerCase(),
+        canonicalUrl: loc,
+        updatedAt: lastmod,
+        publishedAt: post.publishedAt ? new Date(post.publishedAt).toISOString() : lastmod,
+        loc,
+        lastmod,
+      };
+    });
   return res.json({
-    urls: posts.map((post) => ({
-      loc: post.canonicalUrl,
-      lastmod: (post.updatedAt || post.publishedAt).toISOString(),
-    })),
+    posts: mapped,
+    // Keep urls for older clients.
+    urls: mapped.map((post) => ({ loc: post.loc, lastmod: post.lastmod })),
   });
 });
 

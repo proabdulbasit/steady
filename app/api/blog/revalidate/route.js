@@ -55,8 +55,10 @@ export async function POST(request) {
   revalidateTag(BLOG_SITEMAP_TAG, "max");
   revalidatePath("/blog");
   revalidatePath("/sitemap.xml");
+  revalidatePath("/api/sitemap");
+  revalidatePath("/page-sitemap.xml");
 
-  const revalidated = ["/blog", "/sitemap.xml"];
+  const revalidated = ["/blog", "/sitemap.xml", "/api/sitemap", "/page-sitemap.xml"];
   if (slug) {
     revalidateTag(blogPostTag(slug), "max");
     revalidatePath(`/${slug}`);
