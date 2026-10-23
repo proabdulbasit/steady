@@ -37,6 +37,18 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "WorkSteady backend",
+    health: "/health",
+    blog: {
+      posts: "/api/blog/posts?limit=5&page=1",
+      sitemap: "/api/blog/sitemap",
+    },
+  });
+});
+
 app.use("/api/billing/webhook", webhookRoutes);
 // Allow larger JSON bodies (chat attachments are stored as base64).
 app.use(express.json({ limit: "12mb" }));
